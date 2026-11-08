@@ -6,9 +6,7 @@ step. `update` only returns the derivative for the state it is given.
 
 from halo_parameters import HaloParameters
 
-
 import numpy as np
-
 
 class RocketSim:
     def __init__(self,

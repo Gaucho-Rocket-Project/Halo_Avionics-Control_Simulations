@@ -3,6 +3,9 @@
 The BDF solver still takes its own internal substeps inside `solver.step()`.
 This loop does not call the controller on those substeps. The command returned
 here is stored on the plant and is used on the next step.
+
+BDF : backward differentiation formula, it is the numerical method this simulation uses
+to integrate the rockets equations of motion forward in time.
 """
 
 import time
