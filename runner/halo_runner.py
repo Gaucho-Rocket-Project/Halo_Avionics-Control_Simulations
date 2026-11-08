@@ -8,8 +8,6 @@ BDF : backward differentiation formula, it is the numerical method this simulati
 to integrate the rockets equations of motion forward in time.
 """
 
-import time
-
 import matplotlib.pyplot as plt
 import numpy as np
 from scipy.integrate import BDF
@@ -21,10 +19,9 @@ class Runner:
         self.controls = controls
         self.clear_cache()
 
-    def solve(self, State0=[0, 0, 0,
-                            0, 0, 0,
-                            0, 0, 0,
-                            0, 0, 0, 285]):
+    def solve(self, State0=None):
+        if State0 is None:
+            State0 = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, self.sim.params["m0"]]
         initial_command = [0, 0, 0, 0]
         self.controls_cache.append([initial_command])
         self.sim.command = initial_command
@@ -41,13 +38,12 @@ class Runner:
         timestamps = []
         states = []
         status = 0
-        start_time = time.time()
-        solver = BDF(self.sim.update, 0, State0, self.sim.params.t_final)
+        solver = BDF(self.sim.update, 0, State0, self.sim.params["t_final"])
         while solver.status == "running":
             solver.step()
 
-            w_x = np.random.multivariate_normal(np.zeros(6), self.sim.params.Q_kalman)
-            w_y = np.random.multivariate_normal(np.zeros(6), self.sim.params.Q_kalman)
+            w_x = np.random.multivariate_normal(np.zeros(6), self.sim.params["Q_kalman"])
+            w_y = np.random.multivariate_normal(np.zeros(6), self.sim.params["Q_kalman"])
             w_psi = np.random.normal(0, 0.1)
             w = np.array([w_x[0], w_y[0], (w_x[1]+w_y[1])/2, w_x[2], w_y[2], (w_x[3]+w_y[3])/2, w_y[4], w_x[4], 0, w_y[5], w_x[5], w_psi, 0])
             solver.y = solver.y + w*(solver.t - solver.t_old)
@@ -56,18 +52,17 @@ class Runner:
             states.append(solver.y.copy())
 
             X, u = self.controls.LQR_control_algo(solver.t, solver.y, control_times[-1], self.control_states_cache[-1][-1], self.controls_cache[-1][-1])
-            for i in range(5):
-                [control_times, kalman_states_x, kalman_states_y, kalman_roll, kalman_cov_x, kalman_cov_y][i].append(X[i])
+            control_times.append(X[0])
+            kalman_states_x.append(X[1])
+            kalman_states_y.append(X[2])
+            kalman_roll.append(X[3])
+            kalman_cov_x.append(X[4])
+            kalman_cov_y.append(X[5])
             self.control_states_cache[-1].append([kalman_states_x[-1], kalman_states_y[-1], kalman_roll[-1], kalman_cov_x[-1], kalman_cov_y[-1]])
             self.controls_cache[-1].append(u)
             self.sim.command = u
 
-            # Real-clock stop. This is not the simulation time in timestamps.
-            if time.time() - start_time > 10:
-                solver.status = "stopped"
-                status = 1
-                break
-            if (states[-1][2] < 0):
+            if states[-1][2] < 0:
                 solver.status = "stopped"
                 status = 2
                 break
@@ -78,12 +73,12 @@ class Runner:
 
         self.states_cache.append(states)
         self.timestamps_cache.append(timestamps)
-        self.control_times_chache.append(control_times)
+        self.control_times_cache.append(control_times)
         self.status_cache.append(status)
 
     def plot_cache(self, labels=["", "", "", "", "", ""], interval=(0, 0)):
         if interval == (0, 0):
-            interval = (0, self.sim.params.t_final)
+            interval = (0, self.sim.params["t_final"])
         Runner.plot(self.timestamps_cache, self.states_cache, labels, True, interval)
 
     @staticmethod
@@ -138,7 +133,7 @@ class Runner:
     def clear_cache(self):
         self.timestamps_cache = []
         self.states_cache = []
-        self.control_times_chache = []
+        self.control_times_cache = []
         self.control_states_cache = []
         self.controls_cache = []
         self.status_cache = []

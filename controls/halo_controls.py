@@ -1,100 +1,67 @@
 """Flight code: reference trajectory, Kalman filter, LQR, and roll command.
 
-This module does not import the simulator. Vehicle numbers come from a
-HaloParameters object. `lqr` comes from the installed python-control library.
-control/__init__.py loads that library before this file runs, because this
-folder uses the same name as the library.
+This module does not import the simulator. Vehicle and control numbers come
+from dicts supplied by the notebook. `lqr` comes from the installed
+python-control library.
 """
 
 import numpy as np
 import scipy as sp
 from control import lqr
 
-from halo_parameters import HaloParameters
-
 
 class Controls():
-    def __init__(self,
-                 H=50.0,
-                 V=4.0,
-                 Ti=21.0,
-                 Th=10.0,
-                 Tf=54.0,
-                 Q=np.diag([0.1, 350, 0.1, 320, 20, 50]),
-                 R=np.diag([2000, 1536]),
-                 control_frequency=15,
-                 vehicle=None):
-        self.H = H
-        self.V = V
-        self.Ti = Ti
-        self.Th = Th
-        self.Tf = Tf
-        self.R = R
-        self.control_frequency = control_frequency
-        self.dt = 1/control_frequency
+    def __init__(self, vehicle, control):
+        self.set_params(control, vehicle)
+
+    def set_params(self, control, vehicle):
+        self.vehicle = vehicle
+        self.H = control["H"]
+        self.V = control["V"]
+        self.Ti = control["Ti"]
+        self.Th = control["Th"]
+        self.Tf = control["Tf"]
+        self.Z = control["Z"]
+        self.Q = control["Q"]
+        self.R = control["R"]
+        self.R_kalman = control["R_kalman"]
+        self.control_frequency = control["control_frequency"]
+        self.dt = 1 / self.control_frequency
         # Breakpoints of the altitude reference. x1 and x2 bound the climb,
         # Ti starts the hover, x4 ends it, and x6 starts the landing flare.
-        self.Z = 0.83
         self.x1 = self.V / self.Z
         self.x2 = (2/self.V) * (self.H+self.V * self.x1 - 0.5* self.Z * (self.x1**2) ) - self.Ti
-        self.x4 = self.Ti +self.Th
+        self.x4 = self.Ti + self.Th
         self.x5 = self.x4 + (self.Ti - self.x2)
         self.X = self.V/(2*(self.Ti-self.x2))
         self.x6 = (2/self.V) * (self.H+self.V * self.x5 - self.X* ((self.x5-self.x4) **2) ) - self.Tf
         self.Y = self.V/(2*(self.Tf-self.x6))
-        self.Q = Q
-        self.R_kalman = np.diag([1, 1, 1, 1, 1, 1]) * 1e-5
-        if vehicle is None:
-            vehicle = HaloParameters()
-        self.vehicle = vehicle
-        self._build_model(R)
+        self._build_model()
 
-    def set_params(self, H, V, Ti, Th, Tf, Z, Q, R, control_frequency, vehicle):
-        # H is accepted and not stored. The hover height set in __init__ stays.
-        self.V = V
-        self.Ti = Ti
-        self.Th = Th
-        self.Tf = Tf
-        self.R = R
-        self.control_frequency = control_frequency
-        self.dt = 1/control_frequency
-        self.Z = Z
-        self.x1 = self.V / self.Z
-        self.x2 = (2/self.V) * (self.H+self.V * self.x1 - 0.5* self.Z * (self.x1**2) ) - self.Ti
-        self.x4 = self.Ti +self.Th
-        self.x5 = self.x4 + (self.Ti - self.x2)
-        self.X = self.V/(2*(self.Ti-self.x2))
-        self.x6 = (2/self.V) * (self.H+self.V * self.x5 - self.X* ((self.x5-self.x4) **2) ) - self.Tf
-        self.Y = self.V/(2*(self.Tf-self.x6))
-        self.Q = Q
-        self.R_kalman = np.diag([1, 1, 1, 1, 1, 1]) * 1e-5
-        self.vehicle = vehicle
-        self._build_model(R)
-
-    def _build_model(self, R):
-        self.Q_d = np.identity(self.vehicle.Q_kalman.shape[0]) + self.vehicle.Q_kalman * self.dt
+    def _build_model(self):
+        self.Q_d = np.identity(self.vehicle["Q_kalman"].shape[0]) + self.vehicle["Q_kalman"] * self.dt
         self.R_d = self.R_kalman / self.dt
-        self.Iyy = (1/12) * self.vehicle.m0 * (self.vehicle.l ** 2)
-        self.Izz = (1/2) * self.vehicle.m0 * (self.vehicle.r ** 2)
+        self.Iyy = (1/12) * self.vehicle["m0"] * (self.vehicle["l"] ** 2)
+        self.Izz = (1/2) * self.vehicle["m0"] * (self.vehicle["r"] ** 2)
 
         # Onboard model. Six states: x, z, xdot, zdot, theta, thetadot.
         self.Atc = np.zeros([6, 6])
         self.Atc[0, 2] = 1
         self.Atc[1, 3] = 1
-        self.Atc[2, 4] = -self.vehicle.g
+        self.Atc[2, 4] = -self.vehicle["g"]
         self.Atc[4, 5] = 1
 
         self.Btc = np.zeros([6, 2])
-        self.Btc[2, 0] = -self.vehicle.g
-        self.Btc[3, 1] = -self.vehicle.T/self.vehicle.m0
-        self.Btc[5, 0] = self.vehicle.dNoz*self.vehicle.m0*self.vehicle.g/self.Iyy
+        self.Btc[2, 0] = -self.vehicle["g"]
+        self.Btc[3, 1] = -self.vehicle["T"]/self.vehicle["m0"]
+        self.Btc[5, 0] = self.vehicle["dNoz"]*self.vehicle["m0"]*self.vehicle["g"]/self.Iyy
 
         Concatenated = np.concatenate((np.concatenate((self.Atc, self.Btc), axis=1), np.zeros((2, 8))), axis=0)
         Exp_Concat = np.round(sp.linalg.expm(Concatenated * self.dt), decimals=4)
         self.Atd = Exp_Concat[:6, :6]
         self.Btd = Exp_Concat[:6, 6:]
 
-        self.K = lqr(self.Atc, self.Btc, self.Q, R)[0]
+        self.K = lqr(self.Atc, self.Btc, self.Q, self.R)[0]
 
     def z_ref(self, t):
         if t < self.x1:
@@ -126,7 +93,7 @@ class Controls():
         bP = 1.0
         dP = P-P0
         P = P0 + np.clip((dP/self.dt), -0.5, 0.5)*self.dt / bP
-        P = np.clip(P, 0, self.vehicle.P_max)
+        P = np.clip(P, 0, self.vehicle["P_max"])
 
         bgamma = 1.0
         dgamma = gamma-gamma0
@@ -146,8 +113,8 @@ class Controls():
         return [aposteriori_state, aposteriori_covariance]
 
     def Roll_control(self, psi, dpsi, f_prev):
-        ta = ( (self.Izz/self.vehicle.Tau0) * dpsi * np.sign(psi) + np.sqrt( (self.Izz/self.vehicle.Tau0) * np.abs(psi) + 0.5 * (((self.Izz/self.vehicle.Tau0) * dpsi) ** 2) ) )
-        tb = ( (self.Izz/self.vehicle.Tau0) * dpsi * np.sign(psi) + 2 * np.sqrt( (self.Izz/self.vehicle.Tau0) * np.abs(psi) + 0.5 * (((self.Izz/self.vehicle.Tau0) * dpsi) ** 2) ) )
+        ta = ( (self.Izz/self.vehicle["Tau0"]) * dpsi * np.sign(psi) + np.sqrt( (self.Izz/self.vehicle["Tau0"]) * np.abs(psi) + 0.5 * (((self.Izz/self.vehicle["Tau0"]) * dpsi) ** 2) ) )
+        tb = ( (self.Izz/self.vehicle["Tau0"]) * dpsi * np.sign(psi) + 2 * np.sqrt( (self.Izz/self.vehicle["Tau0"]) * np.abs(psi) + 0.5 * (((self.Izz/self.vehicle["Tau0"]) * dpsi) ** 2) ) )
         k = 2
         e_on = 0.02
         e_off = 0.02 * 0.3

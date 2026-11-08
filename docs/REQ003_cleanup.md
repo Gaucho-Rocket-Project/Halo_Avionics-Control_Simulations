@@ -1,2 +1,3 @@
 ## REQ003
-I will be doing some code clean up, and will keep track of it here.
+just some cleaup of the repo. removed some redundancies. put the parameters in the python
+notebook
