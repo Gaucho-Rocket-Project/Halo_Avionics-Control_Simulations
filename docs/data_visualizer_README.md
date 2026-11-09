@@ -10,7 +10,7 @@ python sensor_desktop_app.py
 Or pass a CSV file directly on launch:
 
 ```bash
-python sensor_desktop_app.py path/to/your_sensor_log.csv
+python sensor_desktop_app.py data/sensor_log.csv
 ```
 
 ## Headless / Programmatic Usage (`sensor_grapher.py`)
@@ -40,5 +40,3 @@ Both defaults can be modified, toggled, reassigned to any `temp*` column, or rem
 ## Architecture
 - `sensor_grapher.py`: Core CSV parser, millisecond-to-second timestamp converter, AST-safe calibration formula evaluator, channel statistics calculator, and Matplotlib `SensorGrapher` class (can be imported by any Python desktop app or run via CLI).
 - `sensor_desktop_app.py`: Pure native desktop GUI (`tkinter` + `FigureCanvasTkAgg`) connected to `sensor_grapher.py` with zero web UI / zero browser dependencies.
-- `sample_sensor_data.csv`: Sample sensor CSV log in the exact specified format.
-- `test_sensor_grapher.py`: Standard-library unit tests covering CSV parsing, `nan` handling, seconds conversion, timestamp slicing, and calibration formula CRUD.
