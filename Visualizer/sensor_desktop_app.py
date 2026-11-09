@@ -30,7 +30,7 @@ from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolb
 from matplotlib.figure import Figure
 from matplotlib.widgets import RectangleSelector, SpanSelector
 
-from sensor_grapher import (
+from Visualizer.sensor_grapher import (
     ALL_PSI_TARGET,
     ALL_TEMP_TARGET,
     TIME_MODE_ABSOLUTE_S,
