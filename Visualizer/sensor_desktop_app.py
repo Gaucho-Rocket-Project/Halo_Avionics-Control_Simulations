@@ -19,18 +19,28 @@ Features:
 
 from __future__ import annotations
 
+import io
+import json
 import math
+import os
+import platform
+import queue
+import re
+import subprocess
 import sys
+import tempfile
+import threading
+import traceback
 import tkinter as tk
 from pathlib import Path
 from tkinter import filedialog, messagebox, ttk
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Sequence, Tuple, Union
 
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2Tk
 from matplotlib.figure import Figure
 from matplotlib.widgets import RectangleSelector, SpanSelector
 
-from Visualizer.sensor_grapher import (
+from sensor_grapher import (
     ALL_PSI_TARGET,
     ALL_TEMP_TARGET,
     TIME_MODE_ABSOLUTE_S,
@@ -48,6 +58,56 @@ from Visualizer.sensor_grapher import (
 )
 
 
+FileDialogTypes = Sequence[Tuple[str, Union[str, Sequence[str]]]]
+
+
+def sanitize_file_types(filetypes: FileDialogTypes) -> List[Tuple[str, str]]:
+    """Normalize Tk ``-filetypes`` so the native macOS panel cannot abort the app.
+
+    Tk's Aqua file dialog (``tkMacOSXDialog.c``) parses each entry's extensions as a
+    **whitespace-separated** list, strips leading ``*``/``.`` from every token, then
+    converts each token with ``+[UTType typeWithFilenameExtension:]`` and appends the
+    result to an ``NSMutableArray``. A token that cannot be a filename extension makes
+    that call return ``nil`` and the append raises ``NSInvalidArgumentException``
+    ("object cannot be nil"), which terminates the process with SIGABRT before Python
+    can catch anything.
+
+    ``"*.txt;*.log"`` was the case in point: the semicolon is not a valid extension
+    character, so it became one bogus token (``txt;log``) and crashed the Open CSV
+    dialog on macOS. Linux and Windows use Tk's own dialog, which tolerated it, which
+    is why the crash was macOS-only. This helper rewrites patterns into the documented
+    space-separated form and keeps only safe single extensions.
+    """
+    sanitized: List[Tuple[str, str]] = []
+    for entry in filetypes:
+        label, patterns = entry[0], entry[1]
+        if isinstance(patterns, str):
+            tokens = re.split(r"[;,\s]+", patterns)
+        else:
+            tokens = [token for group in patterns for token in re.split(r"[;,\s]+", str(group))]
+
+        safe_tokens: List[str] = []
+        for token in tokens:
+            token = token.strip()
+            if not token:
+                continue
+            if set(token) <= {"*", "."}:
+                # "*", ".*", "*.*" mean "any file" in Tk.
+                safe_tokens.append("*")
+                continue
+            extension = token.lstrip("*").lstrip(".")
+            if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_-]*", extension):
+                continue  # Drop anything that cannot form a UTType filename extension.
+            safe_tokens.append(f"*.{extension}")
+
+        if not safe_tokens:
+            continue
+        patterns_out = " ".join(dict.fromkeys(safe_tokens))
+        if patterns_out not in {existing for _, existing in sanitized}:
+            sanitized.append((str(label), patterns_out))
+    return sanitized
+
+
 class CalibrationDialog(tk.Toplevel):
     """Modal dialog for adding or modifying a temp/psi calibration formula."""
 
@@ -58,9 +118,10 @@ class CalibrationDialog(tk.Toplevel):
         existing: Optional[CalibrationFormula] = None,
     ) -> None:
         super().__init__(parent)
+        self.withdraw()  # Hide until centered and populated to prevent Linux WM blank window artifacts
         self.title("Edit Calibration Formula" if existing else "Add Calibration Formula")
-        self.transient(parent)
-        self.grab_set()
+        if parent is not None and getattr(parent, "winfo_viewable", lambda: False)():
+            self.transient(parent)
         self.resizable(False, False)
         self.result: Optional[CalibrationFormula] = None
         self.dataset = dataset
@@ -137,6 +198,28 @@ class CalibrationDialog(tk.Toplevel):
         self._refresh_targets(preserve_current=existing is not None)
         self._run_test()
 
+        # Center dialog over parent window, map it, and establish grab
+        self.update_idletasks()
+        try:
+            req_w = self.winfo_reqwidth()
+            req_h = self.winfo_reqheight()
+            p_w = parent.winfo_width()
+            p_h = parent.winfo_height()
+            p_x = parent.winfo_rootx()
+            p_y = parent.winfo_rooty()
+            pos_x = max(0, p_x + (p_w - req_w) // 2)
+            pos_y = max(0, p_y + (p_h - req_h) // 2)
+            self.geometry(f"+{pos_x}+{pos_y}")
+        except Exception:
+            pass
+
+        self.deiconify()
+        self.lift()
+        try:
+            self.grab_set()
+        except Exception:
+            pass
+
     def _refresh_targets(self, preserve_current: bool = False) -> None:
         domain = self.domain_var.get()
         if domain == "temp":
@@ -211,6 +294,165 @@ class ScrollableFrame(ttk.Frame):
         self.scrollbar.pack(side="right", fill="y")
 
 
+class BuildApplicationDialog(tk.Toplevel):
+    """Run the native build in a worker, keeping the desktop application responsive."""
+
+    def __init__(self, parent: tk.Misc, calibrations: List[CalibrationFormula]) -> None:
+        super().__init__(parent)
+        self.title("Build Executable Application")
+        self.geometry("760x540")
+        self.transient(parent)
+        self._running = False
+        self._last_output: Optional[str] = None
+        self._messages: queue.Queue = queue.Queue()
+        self._calibration_json = calibrations_to_json(calibrations)
+        self._builder = Path(__file__).resolve().with_name("build_app.py")
+        self._can_build = not getattr(sys, "frozen", False) and self._builder.is_file()
+        self._target = {"Windows": "windows", "Darwin": "macos", "Linux": "linux"}.get(platform.system(), "")
+        self._output = tk.StringVar(value=str(Path.home() / "SensorTelemetry-builds"))
+        self._mode = tk.StringVar(value="onedir")
+
+        frame = ttk.Frame(self, padding=16)
+        frame.pack(fill="both", expand=True)
+        ttk.Label(frame, text="Build a shareable desktop application", font=("TkDefaultFont", 13, "bold")).pack(anchor="w")
+        ttk.Label(
+            frame,
+            text=f"Target: {platform.system()} / {platform.machine()}. Recipients do not need Python.\n"
+                 "Build on each target OS, or use the included GitHub Actions workflow for all platforms.",
+            wraplength=700, justify="left",
+        ).pack(anchor="w", pady=(6, 12))
+
+        mode_row = ttk.Frame(frame)
+        mode_row.pack(fill="x")
+        ttk.Label(mode_row, text="Layout:").pack(side="left", padx=(0, 10))
+        ttk.Radiobutton(mode_row, text="Application folder (recommended)", variable=self._mode, value="onedir").pack(side="left")
+        ttk.Radiobutton(
+            mode_row, text="Single executable", variable=self._mode, value="onefile",
+            state="disabled" if self._target == "macos" else "normal",
+        ).pack(side="left", padx=10)
+
+        path_row = ttk.Frame(frame)
+        path_row.pack(fill="x", pady=12)
+        ttk.Label(path_row, text="Output folder:").pack(side="left", padx=(0, 8))
+        ttk.Entry(path_row, textvariable=self._output).pack(side="left", fill="x", expand=True)
+        ttk.Button(path_row, text="Browse...", command=self._browse).pack(side="left", padx=(8, 0))
+
+        notice = (
+            "First install the build tools using this Python environment:\n"
+            "python -m pip install -r requirements-build.txt\n"
+            "Current calibration formulas will be included. Build output is unsigned unless you sign it separately."
+            if self._can_build else
+            "Building requires the source project and a Python build environment. Open the downloaded build kit\n"
+            "and run build-windows.bat, build-macos.command, or build-linux.sh on the matching OS.\n"
+            "A packaged application cannot compile other applications using its bundled Python runtime."
+        )
+        ttk.Label(frame, text=notice, wraplength=700, justify="left", foreground="#475569").pack(anchor="w", pady=(0, 10))
+
+        log_frame = ttk.Frame(frame)
+        log_frame.pack(fill="both", expand=True)
+        self._log = tk.Text(log_frame, height=12, wrap="word", state="disabled", font=("TkFixedFont", 9))
+        scroll = ttk.Scrollbar(log_frame, orient="vertical", command=self._log.yview)
+        self._log.configure(yscrollcommand=scroll.set)
+        self._log.pack(side="left", fill="both", expand=True)
+        scroll.pack(side="right", fill="y")
+        buttons = ttk.Frame(frame)
+        buttons.pack(fill="x", pady=(12, 0))
+        self._status = ttk.Label(buttons, text="Ready" if self._can_build else "Source build environment required")
+        self._status.pack(side="left")
+        ttk.Button(buttons, text="Close", command=self._close).pack(side="right", padx=(8, 0))
+        self._build_button = ttk.Button(buttons, text="Build Application", command=self._start, state="normal" if self._can_build else "disabled")
+        self._build_button.pack(side="right")
+        self._open_button = ttk.Button(buttons, text="Open Output Folder", command=self._open_output, state="disabled")
+        self._open_button.pack(side="right", padx=(0, 8))
+        self.protocol("WM_DELETE_WINDOW", self._close)
+        self._poll_id = self.after(150, self._poll)
+
+    def _browse(self) -> None:
+        selected = filedialog.askdirectory(parent=self, title="Choose build output folder")
+        if selected:
+            self._output.set(selected)
+
+    def _start(self) -> None:
+        if self._running or not self._can_build:
+            return
+        if not self._output.get().strip():
+            messagebox.showerror("Output Folder", "Choose an output folder first.", parent=self)
+            return
+        output = str(Path(self._output.get()).expanduser().resolve())
+        self._last_output = output
+        self._running = True
+        self._build_button.configure(state="disabled")
+        self._open_button.configure(state="disabled")
+        self._status.configure(text="Building and testing. This can take several minutes.")
+        threading.Thread(target=self._worker, args=(output, self._mode.get()), daemon=True).start()
+
+    def _worker(self, output: str, mode: str) -> None:
+        try:
+            with tempfile.TemporaryDirectory(prefix="sensor-calibrations-") as temp:
+                profile = Path(temp) / "calibrations.json"
+                profile.write_text(self._calibration_json, encoding="utf-8")
+                command = [
+                    sys.executable, "-u", str(self._builder), "--target", self._target,
+                    "--mode", mode, "--output", output, "--entry", str(Path(__file__).resolve()),
+                    "--calibrations", str(profile),
+                ]
+                with subprocess.Popen(
+                    command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                    text=True, encoding="utf-8", errors="replace",
+                    creationflags=subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0,
+                ) as process:
+                    assert process.stdout is not None
+                    for line in process.stdout:
+                        self._messages.put(("log", line))
+                    code = process.wait()
+            self._messages.put(("done", code))
+        except Exception as exc:
+            self._messages.put(("log", f"Build failed: {exc}\n"))
+            self._messages.put(("done", 1))
+
+    def _poll(self) -> None:
+        try:
+            while True:
+                kind, value = self._messages.get_nowait()
+                if kind == "log":
+                    self._log.configure(state="normal")
+                    self._log.insert("end", value)
+                    self._log.see("end")
+                    self._log.configure(state="disabled")
+                else:
+                    self._running = False
+                    self._build_button.configure(state="normal")
+                    self._open_button.configure(state="normal" if value == 0 else "disabled")
+                    self._status.configure(text="Build and smoke test passed. Share the release archive." if value == 0 else "Build failed. See the log above.")
+        except queue.Empty:
+            pass
+        self._poll_id = self.after(150, self._poll)
+
+    def _open_output(self) -> None:
+        path = self._last_output or str(Path(self._output.get()).expanduser().resolve())
+        try:
+            if sys.platform == "win32":
+                os.startfile(path)
+            else:
+                subprocess.Popen(["open" if sys.platform == "darwin" else "xdg-open", path])
+        except OSError as exc:
+            messagebox.showerror("Open Folder", str(exc), parent=self)
+
+    def _close(self) -> None:
+        if self._running:
+            messagebox.showinfo("Build Running", "Wait for the build to finish before closing this dialog.", parent=self)
+            return
+        self.after_cancel(self._poll_id)
+        self.destroy()
+
+
+def startup_calibrations() -> List[CalibrationFormula]:
+    profile = Path(__file__).resolve().with_name("default_calibrations.json")
+    if profile.is_file():
+        return calibrations_from_json(profile.read_text(encoding="utf-8"))
+    return default_calibrations()
+
+
 class SensorDesktopApp(tk.Tk):
     """Main Tkinter Desktop Software Window connected to SensorGrapher."""
 
@@ -225,7 +467,7 @@ class SensorDesktopApp(tk.Tk):
             SensorDataset.from_csv_file(initial_csv) if initial_csv else SensorDataset.sample()
         )
         self.current_file_label = str(initial_csv) if initial_csv else "Embedded Sample Sensor CSV"
-        self.calibrations: List[CalibrationFormula] = default_calibrations()
+        self.calibrations: List[CalibrationFormula] = startup_calibrations()
 
         # Plot state & zoom tracking
         self._ax_left = None
@@ -277,6 +519,8 @@ class SensorDesktopApp(tk.Tk):
         file_menu.add_command(label="Export Filtered & Calibrated CSV...", command=self.export_csv_dialog)
         file_menu.add_command(label="Save Graph Image (PNG/SVG/PDF)...", command=self.save_graph_dialog)
         file_menu.add_separator()
+        file_menu.add_command(label="Build Executable Application...", command=self.build_application_dialog)
+        file_menu.add_separator()
         file_menu.add_command(label="Exit", command=self.destroy)
         menubar.add_cascade(label="File", menu=file_menu)
 
@@ -306,6 +550,7 @@ class SensorDesktopApp(tk.Tk):
         ttk.Button(top_bar, text="Sample Data", command=self.load_sample_data).pack(side="left", padx=(0, 6))
         ttk.Button(top_bar, text="Export CSV", command=self.export_csv_dialog).pack(side="left", padx=(0, 6))
         ttk.Button(top_bar, text="Save Plot Image", command=self.save_graph_dialog).pack(side="left", padx=(0, 12))
+        ttk.Button(top_bar, text="Build Executable...", command=self.build_application_dialog).pack(side="left", padx=(0, 12))
 
         self.file_status_lbl = ttk.Label(
             top_bar,
@@ -434,7 +679,7 @@ class SensorDesktopApp(tk.Tk):
         self.cal_tree.column("target", width=75)
         self.cal_tree.column("expr", width=130)
         self.cal_tree.pack(fill="x", expand=True)
-        self.cal_tree.bind("<Double-1>", lambda _e: self.edit_calibration_dialog())
+        self.cal_tree.bind("<Double-1>", self._on_cal_tree_double_click)
 
         cal_btns = ttk.Frame(cal_lf)
         cal_btns.pack(fill="x", pady=(6, 0))
@@ -546,6 +791,9 @@ class SensorDesktopApp(tk.Tk):
         data_tab.rowconfigure(0, weight=1)
         data_tab.columnconfigure(0, weight=1)
 
+    def build_application_dialog(self) -> None:
+        BuildApplicationDialog(self, self.calibrations)
+
     # ------------------------------------------------------------ Channel & Cal UI
     def _sync_channel_controls(self, preserve_selection: bool = True) -> None:
         all_channels = self.dataset.available_channels(self.calibrations)
@@ -638,12 +886,29 @@ class SensorDesktopApp(tk.Tk):
                 self.y_left_vars[dlg.result.name].set(True)
             self.replot()
 
+    def _on_cal_tree_double_click(self, event: Optional[tk.Event] = None) -> None:
+        if event is not None:
+            region = self.cal_tree.identify_region(event.x, event.y)
+            if region not in ("tree", "cell"):
+                return
+            row_id = self.cal_tree.identify_row(event.y)
+            if row_id:
+                self.cal_tree.selection_set(row_id)
+            else:
+                return
+        self.edit_calibration_dialog()
+
     def edit_calibration_dialog(self) -> None:
         sel = self.cal_tree.selection()
         if not sel:
             messagebox.showinfo("Select Formula", "Select a calibration formula row to edit.", parent=self)
             return
-        idx = int(sel[0])
+        try:
+            idx = int(sel[0])
+            if idx < 0 or idx >= len(self.calibrations):
+                return
+        except (ValueError, IndexError):
+            return
         old_name = self.calibrations[idx].name
         dlg = CalibrationDialog(self, self.dataset, existing=self.calibrations[idx])
         self.wait_window(dlg)
@@ -689,7 +954,7 @@ class SensorDesktopApp(tk.Tk):
         path = filedialog.asksaveasfilename(
             title="Save Calibration Profile",
             defaultextension=".json",
-            filetypes=[("JSON Files", "*.json"), ("All Files", "*.*")],
+            filetypes=sanitize_file_types([("JSON Files", "*.json"), ("All Files", "*.*")]),
         )
         if path:
             Path(path).write_text(calibrations_to_json(self.calibrations), encoding="utf-8")
@@ -697,7 +962,7 @@ class SensorDesktopApp(tk.Tk):
     def load_calibrations_dialog(self) -> None:
         path = filedialog.askopenfilename(
             title="Load Calibration Profile",
-            filetypes=[("JSON Files", "*.json"), ("All Files", "*.*")],
+            filetypes=sanitize_file_types([("JSON Files", "*.json"), ("All Files", "*.*")]),
         )
         if not path:
             return
@@ -714,7 +979,7 @@ class SensorDesktopApp(tk.Tk):
     def load_csv_dialog(self) -> None:
         path = filedialog.askopenfilename(
             title="Open Sensor CSV File",
-            filetypes=[("CSV Files", "*.csv"), ("Text / Log Files", "*.txt;*.log"), ("All Files", "*.*")],
+            filetypes=sanitize_file_types([("CSV Files", "*.csv"), ("Text / Log Files", "*.txt *.log"), ("All Files", "*.*")]),
         )
         if not path:
             return
@@ -744,7 +1009,7 @@ class SensorDesktopApp(tk.Tk):
         path = filedialog.asksaveasfilename(
             title="Export Filtered & Calibrated CSV",
             defaultextension=".csv",
-            filetypes=[("CSV Files", "*.csv")],
+            filetypes=sanitize_file_types([("CSV Files", "*.csv")]),
         )
         if not path:
             return
@@ -755,7 +1020,7 @@ class SensorDesktopApp(tk.Tk):
         path = filedialog.asksaveasfilename(
             title="Save Graph Image",
             defaultextension=".png",
-            filetypes=[("PNG Image", "*.png"), ("SVG Vector", "*.svg"), ("PDF Document", "*.pdf")],
+            filetypes=sanitize_file_types([("PNG Image", "*.png"), ("SVG Vector", "*.svg"), ("PDF Document", "*.pdf")]),
         )
         if not path:
             return
@@ -1095,9 +1360,52 @@ class SensorDesktopApp(tk.Tk):
 
 
 def main(argv: Optional[List[str]] = None) -> int:
-    args = sys.argv[1:] if argv is None else argv
-    csv_path = Path(args[0]) if args else None
-    app = SensorDesktopApp(initial_csv=csv_path)
+    import argparse
+
+    parser = argparse.ArgumentParser(description="Native Sensor Telemetry desktop application")
+    parser.add_argument("csv_file", nargs="?", type=Path)
+    parser.add_argument("--smoke-test", action="store_true", help="Validate the packaged GUI, exports, and calibrations, then exit.")
+    parser.add_argument("--smoke-report", type=Path, help=argparse.SUPPRESS)
+    args = parser.parse_args([arg for arg in (sys.argv[1:] if argv is None else argv) if not arg.startswith("-psn_")])
+    if args.smoke_test:
+        app = None
+        try:
+            app = SensorDesktopApp(initial_csv=args.csv_file)
+            app.withdraw()
+            app.update_idletasks()
+            app.canvas.draw()
+            for image_format in ("png", "pdf", "svg"):
+                image = io.BytesIO()
+                app.figure.savefig(image, format=image_format)
+                if image.getbuffer().nbytes == 0:
+                    raise RuntimeError(f"Empty {image_format} graph export")
+            test_cal = CalibrationFormula(name="smoke", expression="0.528 * tempC + 0.517")
+            if not math.isclose(test_cal.apply_value(16.5), 9.229):
+                raise RuntimeError("Calibration formula smoke test failed")
+
+            # The native macOS open panel aborts the process (SIGABRT) if any file
+            # filter token cannot become a UTType filename extension, and Python
+            # cannot catch that abort. Verify every dialog filter here instead.
+            dangerous = sanitize_file_types([("Text / Log Files", "*.txt;*.log"), ("All Files", "*.*")])
+            if dangerous != [("Text / Log Files", "*.txt *.log"), ("All Files", "*")]:
+                raise RuntimeError(f"File filter sanitization failed: {dangerous}")
+            if any(";" in patterns for _, patterns in dangerous):
+                raise RuntimeError("File filter still contains an unsafe token separator")
+
+            report = {"status": "passed", "tk": tk.TkVersion, "samples": len(app.dataset.rows), "calibrations": [cal.name for cal in app.calibrations], "exports": ["png", "pdf", "svg"], "file_filters": "sanitized"}
+            code = 0
+        except Exception:
+            report = {"status": "failed", "error": traceback.format_exc()}
+            code = 1
+        finally:
+            if app is not None:
+                app.destroy()
+        if args.smoke_report:
+            args.smoke_report.write_text(json.dumps(report, indent=2), encoding="utf-8")
+        if sys.stdout is not None:
+            print(json.dumps(report))
+        return code
+    app = SensorDesktopApp(initial_csv=args.csv_file)
     app.mainloop()
     return 0
 
