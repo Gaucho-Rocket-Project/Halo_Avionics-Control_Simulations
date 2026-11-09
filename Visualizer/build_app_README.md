@@ -187,6 +187,64 @@ notarization credentials, Windows signing, and App Store submission are not
 automated by the supplied workflow. Test on clean Windows/macOS machines before
 sharing outside your development environment.
 
+## Troubleshooting
+
+### `Failed to execute script 'sensor_desktop_app' ... No module named '<YourFolder>'`
+
+The frozen app contains an import such as `from Visualizer.sensor_grapher import ...`
+or `from .sensor_grapher import ...`, where `Visualizer` is the name of the folder
+holding your source. A repository folder name is a valid package name, so the code
+runs fine from source. PyInstaller, however, freezes the entry script as a
+**top-level** module, so the parent package is not importable at runtime and the app
+exits before the window opens.
+
+`build_app.py` now prevents this automatically. Before building it:
+
+1. Copies the entry script, its sibling modules, and any local packages into a
+   neutral build folder (`.build/app-snapshot/`), deliberately leaving out
+   `__init__.py` so the snapshot is not a package.
+2. Rewrites local imports in that snapshot to top-level form:
+   `from Visualizer.sensor_grapher import ...` -> `from sensor_grapher import ...`,
+   and `from .sensor_grapher import ...` -> `from sensor_grapher import ...`.
+   Your source files are never modified.
+3. Logs every rewrite it makes. For imports it cannot rewrite (for example a bare
+   `import Visualizer.sensor_grapher`), it prints a warning and bundles the real
+   package instead by adding it as a hidden import with your repo root on the search path.
+4. Runs the packaged executable with `--smoke-test`. If the window cannot be created
+   because of an import problem, the build **fails and no archive is produced**.
+
+To pick the fix up, replace your copy of `build_app.py` with the current version
+(or re-download the build kit) and rebuild. If you previously used
+`--skip-smoke-test` or your own PyInstaller command, rebuild with the smoke test
+enabled so this class of error can never ship again.
+
+Running PyInstaller manually instead? Use the plain sibling import
+(`from sensor_grapher import ...`) in the entry script, and add your repo root plus
+the package name so analysis still succeeds:
+
+```sh
+pyinstaller --noconfirm --windowed --name SensorTelemetry \
+  --paths .. --hidden-import Visualizer \
+  --hidden-import matplotlib.backends.backend_tkagg \
+  --collect-submodules matplotlib.backends \
+  Visualizer/sensor_desktop_app.py
+```
+
+Note that PyInstaller is not a cross-compiler, so the command above must run on the
+OS you are targeting. Other frozen-app symptoms: an empty window or an immediate
+exit on a headless Linux machine means there is no display server (use
+`xvfb-run -a` for testing); a Windows dialog mentioning `api-ms-win-crt` means the
+target machine is missing the Universal C Runtime update.
+
+### Other checks
+
+- Confirm the artifact you downloaded matches your OS and CPU architecture.
+- Extract the **entire** archive; the `.exe` needs its sibling runtime folder in
+  onedir mode, and `launch.sh` needs the executable bit that `.tar.gz` preserves.
+- On macOS, remove the quarantine attribute on unsigned local builds with
+  `xattr -dr com.apple.quarantine /Applications/SensorTelemetry.app` if Gatekeeper
+  blocks an app you built yourself.
+
 ## Tests
 
 ```sh
