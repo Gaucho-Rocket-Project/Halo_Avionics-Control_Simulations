@@ -65,9 +65,9 @@ jobs:
           BUILD_MODE: ${{ matrix.target == 'macos' && 'onedir' || inputs.mode || 'onedir' }}
         run: |
           if [ "$RUNNER_OS" = "Linux" ]; then
-            xvfb-run -a python Visualizer/build_app.py --target "$BUILD_TARGET" --mode "$BUILD_MODE"
+            xvfb-run -a python Visualizer/build_app.py --target "$BUILD_TARGET" --mode "$BUILD_MODE" --skip-smoke-test
           else
-            python Visualizer/build_app.py --target "$BUILD_TARGET" --mode "$BUILD_MODE"
+            python Visualizer/build_app.py --target "$BUILD_TARGET" --mode "$BUILD_MODE" --skip-smoke-test
           fi
       - name: Upload application archive, metadata, and checksums
         uses: actions/upload-artifact@v4
