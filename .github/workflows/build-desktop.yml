@@ -11,7 +11,7 @@ on:
   push:
     tags: ['sensor-v*']
   pull_request:
-    paths: ['python_app/**', '.github/workflows/build-desktop.yml']
+    paths: ['Visualizer/**', '.github/workflows/build-desktop.yml']
 
 permissions:
   contents: read
@@ -52,12 +52,12 @@ jobs:
           python-version: '3.12'
           architecture: ${{ matrix.python-arch }}
           cache: pip
-          cache-dependency-path: 'python_app/requirements*.txt'
+          cache-dependency-path: 'Visualizer/requirements*.txt'
       - name: Install Linux GUI and packaging libraries
         if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y python3-tk xvfb xauth binutils libx11-6 libxext6 libxrender1 libfontconfig1
       - name: Install build dependencies
-        run: python -m pip install -r python_app/requirements-build.txt
+        run: python -m pip install -r Visualizer/requirements-build.txt
       - name: Run unit tests
         run: python -B -m unittest discover -s python_app -v
       - name: Build and smoke-test the native application
@@ -67,14 +67,14 @@ jobs:
           BUILD_MODE: ${{ matrix.target == 'macos' && 'onedir' || inputs.mode || 'onedir' }}
         run: |
           if [ "$RUNNER_OS" = "Linux" ]; then
-            xvfb-run -a python python_app/build_app.py --target "$BUILD_TARGET" --mode "$BUILD_MODE"
+            xvfb-run -a python Visualizer/build_app.py --target "$BUILD_TARGET" --mode "$BUILD_MODE"
           else
-            python python_app/build_app.py --target "$BUILD_TARGET" --mode "$BUILD_MODE"
+            python Visualizer/build_app.py --target "$BUILD_TARGET" --mode "$BUILD_MODE"
           fi
       - name: Upload application archive, metadata, and checksums
         uses: actions/upload-artifact@v4
         with:
           name: SensorTelemetry-${{ matrix.target }}-${{ matrix.cpu }}
-          path: python_app/dist/native/**/releases/*
+          path: Visualizer/dist/native/**/releases/*
           if-no-files-found: error
           retention-days: 30
