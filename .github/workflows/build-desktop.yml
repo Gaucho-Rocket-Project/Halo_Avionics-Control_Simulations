@@ -11,7 +11,7 @@ on:
   push:
     tags: ['sensor-v*']
   pull_request:
-    paths: ['Visualizer/**', '.github/workflows/build-desktop.yml']
+    paths: ['**/*.py', 'requirements*.txt', '.github/workflows/build-desktop.yml']
 
 permissions:
   contents: read
@@ -52,12 +52,30 @@ jobs:
           python-version: '3.12'
           architecture: ${{ matrix.python-arch }}
           cache: pip
-          cache-dependency-path: 'Visualizer/requirements*.txt'
+          cache-dependency-path: '**/requirements*.txt'
+      - name: Locate the application sources
+        shell: bash
+        run: |
+          # The build kit may live in any folder (python_app/, Visualizer/, the repo root, ...).
+          src=""
+          for candidate in python_app Visualizer app src .; do
+            if [ -f "$candidate/build_app.py" ]; then src="$candidate"; break; fi
+          done
+          if [ -z "$src" ]; then
+            found="$(find . -name build_app.py -not -path '*/.build-venv/*' -not -path '*/node_modules/*' | head -n 1)"
+            if [ -n "$found" ]; then src="$(dirname "$found")"; fi
+          fi
+          if [ -z "$src" ]; then
+            echo "::error::build_app.py was not found. Commit the build kit (build_app.py, requirements-build.txt, sensor_desktop_app.py) to the repository." >&2
+            exit 1
+          fi
+          echo "SRC_DIR=$src" >> "$GITHUB_ENV"
+          echo "Building the native application from: $src"
       - name: Install Linux GUI and packaging libraries
         if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y python3-tk xvfb xauth binutils libx11-6 libxext6 libxrender1 libfontconfig1
       - name: Install build dependencies
-        run: python -m pip install -r Visualizer/requirements-build.txt
+        run: python -m pip install -r "${{ env.SRC_DIR }}/requirements-build.txt"
       - name: Build and smoke-test the native application
         shell: bash
         env:
@@ -65,14 +83,14 @@ jobs:
           BUILD_MODE: ${{ matrix.target == 'macos' && 'onedir' || inputs.mode || 'onedir' }}
         run: |
           if [ "$RUNNER_OS" = "Linux" ]; then
-            xvfb-run -a python Visualizer/build_app.py --target "$BUILD_TARGET" --mode "$BUILD_MODE" --skip-smoke-test
+            xvfb-run -a python "${{ env.SRC_DIR }}/build_app.py" --target "$BUILD_TARGET" --mode "$BUILD_MODE" --skip-smoke-test
           else
-            python Visualizer/build_app.py --target "$BUILD_TARGET" --mode "$BUILD_MODE" --skip-smoke-test
+            python "${{ env.SRC_DIR }}/build_app.py" --target "$BUILD_TARGET" --mode "$BUILD_MODE" --skip-smoke-test
           fi
       - name: Upload application archive, metadata, and checksums
         uses: actions/upload-artifact@v4
         with:
           name: SensorTelemetry-${{ matrix.target }}-${{ matrix.cpu }}
-          path: Visualizer/dist/native/**/releases/*
+          path: ${{ env.SRC_DIR }}/dist/native/**/releases/*
           if-no-files-found: error
           retention-days: 30
