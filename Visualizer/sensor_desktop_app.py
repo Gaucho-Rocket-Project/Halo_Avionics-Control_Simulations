@@ -25,6 +25,7 @@ import math
 import os
 import platform
 import queue
+import re
 import subprocess
 import sys
 import tempfile
@@ -33,7 +34,7 @@ import traceback
 import tkinter as tk
 from pathlib import Path
 from tkinter import filedialog, messagebox, ttk
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Sequence, Tuple, Union
 
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2Tk
 from matplotlib.figure import Figure
@@ -55,6 +56,56 @@ from sensor_grapher import (
     default_calibrations,
     infer_column_domain,
 )
+
+
+FileDialogTypes = Sequence[Tuple[str, Union[str, Sequence[str]]]]
+
+
+def sanitize_file_types(filetypes: FileDialogTypes) -> List[Tuple[str, str]]:
+    """Normalize Tk ``-filetypes`` so the native macOS panel cannot abort the app.
+
+    Tk's Aqua file dialog (``tkMacOSXDialog.c``) parses each entry's extensions as a
+    **whitespace-separated** list, strips leading ``*``/``.`` from every token, then
+    converts each token with ``+[UTType typeWithFilenameExtension:]`` and appends the
+    result to an ``NSMutableArray``. A token that cannot be a filename extension makes
+    that call return ``nil`` and the append raises ``NSInvalidArgumentException``
+    ("object cannot be nil"), which terminates the process with SIGABRT before Python
+    can catch anything.
+
+    ``"*.txt;*.log"`` was the case in point: the semicolon is not a valid extension
+    character, so it became one bogus token (``txt;log``) and crashed the Open CSV
+    dialog on macOS. Linux and Windows use Tk's own dialog, which tolerated it, which
+    is why the crash was macOS-only. This helper rewrites patterns into the documented
+    space-separated form and keeps only safe single extensions.
+    """
+    sanitized: List[Tuple[str, str]] = []
+    for entry in filetypes:
+        label, patterns = entry[0], entry[1]
+        if isinstance(patterns, str):
+            tokens = re.split(r"[;,\s]+", patterns)
+        else:
+            tokens = [token for group in patterns for token in re.split(r"[;,\s]+", str(group))]
+
+        safe_tokens: List[str] = []
+        for token in tokens:
+            token = token.strip()
+            if not token:
+                continue
+            if set(token) <= {"*", "."}:
+                # "*", ".*", "*.*" mean "any file" in Tk.
+                safe_tokens.append("*")
+                continue
+            extension = token.lstrip("*").lstrip(".")
+            if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_-]*", extension):
+                continue  # Drop anything that cannot form a UTType filename extension.
+            safe_tokens.append(f"*.{extension}")
+
+        if not safe_tokens:
+            continue
+        patterns_out = " ".join(dict.fromkeys(safe_tokens))
+        if patterns_out not in {existing for _, existing in sanitized}:
+            sanitized.append((str(label), patterns_out))
+    return sanitized
 
 
 class CalibrationDialog(tk.Toplevel):
@@ -903,7 +954,7 @@ class SensorDesktopApp(tk.Tk):
         path = filedialog.asksaveasfilename(
             title="Save Calibration Profile",
             defaultextension=".json",
-            filetypes=[("JSON Files", "*.json"), ("All Files", "*.*")],
+            filetypes=sanitize_file_types([("JSON Files", "*.json"), ("All Files", "*.*")]),
         )
         if path:
             Path(path).write_text(calibrations_to_json(self.calibrations), encoding="utf-8")
@@ -911,7 +962,7 @@ class SensorDesktopApp(tk.Tk):
     def load_calibrations_dialog(self) -> None:
         path = filedialog.askopenfilename(
             title="Load Calibration Profile",
-            filetypes=[("JSON Files", "*.json"), ("All Files", "*.*")],
+            filetypes=sanitize_file_types([("JSON Files", "*.json"), ("All Files", "*.*")]),
         )
         if not path:
             return
@@ -928,7 +979,7 @@ class SensorDesktopApp(tk.Tk):
     def load_csv_dialog(self) -> None:
         path = filedialog.askopenfilename(
             title="Open Sensor CSV File",
-            filetypes=[("CSV Files", "*.csv"), ("Text / Log Files", "*.txt;*.log"), ("All Files", "*.*")],
+            filetypes=sanitize_file_types([("CSV Files", "*.csv"), ("Text / Log Files", "*.txt *.log"), ("All Files", "*.*")]),
         )
         if not path:
             return
@@ -958,7 +1009,7 @@ class SensorDesktopApp(tk.Tk):
         path = filedialog.asksaveasfilename(
             title="Export Filtered & Calibrated CSV",
             defaultextension=".csv",
-            filetypes=[("CSV Files", "*.csv")],
+            filetypes=sanitize_file_types([("CSV Files", "*.csv")]),
         )
         if not path:
             return
@@ -969,7 +1020,7 @@ class SensorDesktopApp(tk.Tk):
         path = filedialog.asksaveasfilename(
             title="Save Graph Image",
             defaultextension=".png",
-            filetypes=[("PNG Image", "*.png"), ("SVG Vector", "*.svg"), ("PDF Document", "*.pdf")],
+            filetypes=sanitize_file_types([("PNG Image", "*.png"), ("SVG Vector", "*.svg"), ("PDF Document", "*.pdf")]),
         )
         if not path:
             return
@@ -1331,7 +1382,17 @@ def main(argv: Optional[List[str]] = None) -> int:
             test_cal = CalibrationFormula(name="smoke", expression="0.528 * tempC + 0.517")
             if not math.isclose(test_cal.apply_value(16.5), 9.229):
                 raise RuntimeError("Calibration formula smoke test failed")
-            report = {"status": "passed", "tk": tk.TkVersion, "samples": len(app.dataset.rows), "calibrations": [cal.name for cal in app.calibrations], "exports": ["png", "pdf", "svg"]}
+
+            # The native macOS open panel aborts the process (SIGABRT) if any file
+            # filter token cannot become a UTType filename extension, and Python
+            # cannot catch that abort. Verify every dialog filter here instead.
+            dangerous = sanitize_file_types([("Text / Log Files", "*.txt;*.log"), ("All Files", "*.*")])
+            if dangerous != [("Text / Log Files", "*.txt *.log"), ("All Files", "*")]:
+                raise RuntimeError(f"File filter sanitization failed: {dangerous}")
+            if any(";" in patterns for _, patterns in dangerous):
+                raise RuntimeError("File filter still contains an unsafe token separator")
+
+            report = {"status": "passed", "tk": tk.TkVersion, "samples": len(app.dataset.rows), "calibrations": [cal.name for cal in app.calibrations], "exports": ["png", "pdf", "svg"], "file_filters": "sanitized"}
             code = 0
         except Exception:
             report = {"status": "failed", "error": traceback.format_exc()}
