@@ -7,7 +7,7 @@ on:
         description: Windows/Linux layout (macOS always uses an .app bundle)
         type: choice
         options: [onedir, onefile]
-        default: onedir
+        default: onefile
   push:
     tags: ['sensor-v*']
   pull_request:
