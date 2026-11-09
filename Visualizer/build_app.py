@@ -58,7 +58,7 @@ def create_build_plan(
     output_root: Path,
     target: str | None = None,
     mode: str = "onedir",
-    version: str = "1.0.0",
+    version: str = "1.0.2",
     *,
     host_system: str | None = None,
     machine: str | None = None,
