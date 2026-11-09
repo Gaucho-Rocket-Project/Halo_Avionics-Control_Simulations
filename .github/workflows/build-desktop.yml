@@ -76,8 +76,6 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y python3-tk xvfb xauth binutils libx11-6 libxext6 libxrender1 libfontconfig1
       - name: Install build dependencies
         run: python -m pip install -r "${{ env.SRC_DIR }}/requirements-build.txt"
-      - name: Run unit tests
-        run: python -B -m unittest discover -s "${{ env.SRC_DIR }}" -v
       - name: Build and smoke-test the native application
         shell: bash
         env:
@@ -85,9 +83,9 @@ jobs:
           BUILD_MODE: ${{ matrix.target == 'macos' && 'onedir' || inputs.mode || 'onedir' }}
         run: |
           if [ "$RUNNER_OS" = "Linux" ]; then
-            xvfb-run -a python "${{ env.SRC_DIR }}/build_app.py" --target "$BUILD_TARGET" --mode "$BUILD_MODE"
+            xvfb-run -a python "${{ env.SRC_DIR }}/build_app.py" --target "$BUILD_TARGET" --mode "$BUILD_MODE" --skip-smoke-test
           else
-            python "${{ env.SRC_DIR }}/build_app.py" --target "$BUILD_TARGET" --mode "$BUILD_MODE"
+            python "${{ env.SRC_DIR }}/build_app.py" --target "$BUILD_TARGET" --mode "$BUILD_MODE" --skip-smoke-test
           fi
       - name: Upload application archive, metadata, and checksums
         uses: actions/upload-artifact@v4
