@@ -1,7 +1,7 @@
 ## REQ002 byte-identical verification tests
 Luca Romero
 11/9/2026
-execution status: planned, not executed
+execution status: executed
 
 ## Goal
 
