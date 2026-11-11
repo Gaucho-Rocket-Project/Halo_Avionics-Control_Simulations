@@ -9,4 +9,4 @@ Code for the trajectory simulation of Halo/Halo Jr. under control algorithms
 
 ## Report bugs & provide feedback/suggestions:
 
-[Click here for the feedback/suggestions form]([url](https://forms.gle/GfezDddok54yw9PK9))
+[Click here for the feedback/suggestions form](https://forms.gle/GfezDddok54yw9PK9)
