@@ -4,7 +4,7 @@ Code for simulating the trajectories of Halo and Halo Jr. under different contro
 
 ## Dashboard
 
-From this directory, run:
+From the directory RocketSim, run:
 
 ```bash
 python dashboard.py
