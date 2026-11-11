@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>HALO trajectory control pad</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M8 1 11 6v6H5V6Z' fill='%23ff7043'/%3E%3Cpath d='m5 12-2 3m8-3 2 3' stroke='%23ff7043' stroke-width='1.4'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="style.css">
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+    }
+  }
+  </script>
+  <script type="module" src="main.js"></script>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="mark">H</span>
+      <span>HALO <small>trajectory control pad</small></span>
+    </div>
+    <div id="serverStatus" class="status"><span class="status-dot"></span> Simulator ready</div>
+  </header>
+
+  <main class="workspace">
+    <aside class="parameters panel">
+      <div class="panel-heading">
+        <div><span class="eyebrow">Flight setup</span><h1>Mission parameters</h1></div>
+        <button id="resetButton" class="quiet" type="button">Reset</button>
+      </div>
+      <form id="parameterForm" autocomplete="off"></form>
+      <div class="launch-bar">
+        <button id="launchButton" class="launch" type="button"><span>Launch simulation</span><span aria-hidden="true">→</span></button>
+        <div id="formError" class="error" role="alert"></div>
+      </div>
+    </aside>
+
+    <section class="flight-view">
+      <div id="scene" class="scene"></div>
+      <div class="hud top-left">
+        <span id="phase" class="phase ready">READY</span>
+        <span id="clock">T+ 00:00.0</span>
+      </div>
+      <div class="hud top-right">
+        <span class="scale-label">Grid 5 m · Rocket 1 m</span>
+        <button id="cameraButton" class="glass-button" type="button">Overview</button>
+      </div>
+      <div id="solving" class="solving hidden">
+        <div class="loader"></div>
+        <strong>Solving trajectory</strong>
+        <span>Integrating dynamics and LQR control…</span>
+      </div>
+      <div class="playback glass">
+        <button id="playButton" type="button" disabled aria-label="Play or pause">▶</button>
+        <button id="replayButton" type="button" disabled aria-label="Replay">↺</button>
+        <span id="playbackTime" class="mono">0.0 / 0.0 s</span>
+        <input id="timeline" type="range" min="0" max="1" step="0.001" value="0" disabled aria-label="Flight time">
+        <select id="speed" aria-label="Playback speed">
+          <option value="0.5">0.5×</option>
+          <option value="1" selected>1×</option>
+          <option value="2">2×</option>
+          <option value="4">4×</option>
+          <option value="8">8×</option>
+        </select>
+      </div>
+    </section>
+
+    <aside class="telemetry panel">
+      <div class="panel-heading telemetry-title">
+        <div><span class="eyebrow">Live playback</span><h1>Telemetry</h1></div>
+        <span id="sampleRate" class="chip">30 Hz</span>
+      </div>
+      <div id="telemetryGrid" class="telemetry-grid"></div>
+      <section class="chart-card">
+        <div class="chart-title"><strong>Altitude</strong><span><i class="actual"></i>Actual <i class="reference"></i>Reference</span></div>
+        <canvas id="altitudeChart"></canvas>
+      </section>
+      <section class="chart-card">
+        <div class="chart-title"><strong>Ground track</strong><span>x / y displacement</span></div>
+        <canvas id="trackChart"></canvas>
+      </section>
+      <section id="result" class="result hidden"></section>
+    </aside>
+  </main>
+</body>
+</html>
