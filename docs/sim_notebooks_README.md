@@ -8,6 +8,7 @@ From this directory, run:
 
 ```bash
 python dashboard.py
+```
 
 Open the local address printed in the terminal to configure a flight and view its 3D animation, trajectory, and telemetry.
 
