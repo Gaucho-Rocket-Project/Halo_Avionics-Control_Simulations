@@ -235,7 +235,7 @@ def run_simulation(config: dict[str, Any]) -> dict[str, Any]:
     os.environ.setdefault("MPLCONFIGDIR", str(Path(tempfile.gettempdir()) / "halo-matplotlib"))
     try:
         import numpy as np
-        import RocketSim.RocketSim as RocketSim
+        import RocketSim as RocketSim
     except ImportError as exc:
         raise RuntimeError(
             f"RocketSim dependency is missing ({exc.name}). Install numpy, scipy, matplotlib, and control in this Python environment."
