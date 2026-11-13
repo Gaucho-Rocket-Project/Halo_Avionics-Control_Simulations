@@ -35,6 +35,7 @@ STATE_NAMES = [
     "x", "y", "z", "dx", "dy", "dz",
     "phi", "theta", "psi", "dphi", "dtheta", "dpsi", "m",
 ]
+
 COMMAND_NAMES = ["P", "gx", "gy", "f"]
 
 # All the numerical parameters for control
@@ -80,6 +81,7 @@ PARAMS = {
     "wind_seed" : None,
     "position_variance" : 1e-10,
     "velocity_variance" : 1e-5,
+    "Q_kalman": np.diag([1e-10, 1e-10, 1e-5, 1e-5, 1e-10, 1e-7]),
 }
 
 def default_spec():
@@ -313,5 +315,5 @@ def main(argv):
     print("usage: run.py check | run.py record <version>", file=sys.stderr)
     return 2
 
-if __name__ == "__main__":
-    sys.exit(main(sys.argv))
+# if __name__ == "__main__":
+#     sys.exit(main(sys.argv))
