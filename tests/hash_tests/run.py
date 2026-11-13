@@ -38,9 +38,8 @@ STATE_NAMES = [
 
 COMMAND_NAMES = ["P", "gx", "gy", "f"]
 
-# All the numerical parameters for control
-# control also needs sim_params
-CONTROL = {
+PARAMETERS = {
+    # sim paramaters
     "H": 50.0,
     "V": 4.0,
     "Ti": 21.0,
@@ -51,30 +50,24 @@ CONTROL = {
     "R": np.diag([2000, 1536]),
     "R_kalman": np.diag([1, 1, 1, 1, 1, 1]) * 1e-5,
     "control_frequency": 15, # control frequency, dt = 1 / frequency 
-}
-# All the numerical parameters needed for the simulation
-PARAMS = {
-    #Class parameters
+
+    # sim + controls shared paramaters
     "T" : 3000,                   #Max thrust
     "P_max" : 0.4,               #Max throttle percentage
     "m0" : 285,                  #Initial mass
     "m_dot" : 1.75,               #Mass flow at max thrust
     "g" : 9.8,                     #Gravity
     "dNoz" : 0.7,                #Distance from CoM to Nozzle
-    "t_final" : 65,             #Final simulation time
     "l" : 2.5,                   #Effective length
     "r" : 0.2,                   #Effective radius
     "Tau0" : 3.23,                #RCS torque magnitude
     "Cd0" : 0.8,                 #Coeff of drag NOTE: ADD THIS TO halo_control script (it's only here right now)
-
+    
     "Cl0" : 6.28,                 #Coeff of lift
     "S0" : 0.126,                  #Reference area
     "dCoP" : 1,                #Distance from CoM to Center of Pressure
     "rho" : 1.225,                 #Density of air
-    "State0" : [0,0,0,
-                0,0,0,
-                0,0,0,
-                0,0,0],
+    "State0": [0, 0, 0, 0, 0, 0, 0, 0.05, 0.05, 0, 0, 0, 285], # the 285 is m0
     "wind_speed" : 0.0,          #Steady horizontal wind magnitude
     "wind_direction" : 0.0,      #Wind direction from +x toward +y (radians)
     "gust_variance" : 0.0,       #Variance of each horizontal gust component
@@ -82,51 +75,11 @@ PARAMS = {
     "position_variance" : 1e-10,
     "velocity_variance" : 1e-5,
     "Q_kalman": np.diag([1e-10, 1e-10, 1e-5, 1e-5, 1e-10, 1e-7]),
+
+    "seed" : 1,
+    "t_final" : 2,
+
 }
-
-def default_spec():
-    params = dict(PARAMS)
-    params["Q_kalman"] = np.array(PARAMS["Q_kalman"], dtype=np.float64, copy=True)
-    control = dict(CONTROL)
-    for key in ("Q", "R", "R_kalman"):
-        control[key] = np.array(CONTROL[key], dtype=np.float64, copy=True)
-    return {
-        "seed": 1,
-        "t_final": 2.0,
-        "State0": [0, 0, 0, 0, 0, 0, 0, 0.05, 0.05, 0, 0, 0, params["m0"]],
-        "params": params,
-        "control": control,
-    }
-
-def spec_to_json(spec):
-    params = dict(spec["params"])
-    params["Q_kalman"] = np.asarray(params["Q_kalman"], dtype=np.float64).tolist()
-    params["t_final"] = spec["t_final"]
-    control = dict(spec["control"])
-    for key in ("Q", "R", "R_kalman"):
-        control[key] = np.asarray(control[key], dtype=np.float64).tolist()
-    return {
-        "seed": spec["seed"],
-        "t_final": spec["t_final"],
-        "State0": list(spec["State0"]),
-        "params": params,
-        "control": control,
-    }
-
-def spec_from_json(raw):
-    params = dict(raw["params"])
-    params["Q_kalman"] = np.array(params["Q_kalman"], dtype=np.float64)
-    params["t_final"] = raw["t_final"]
-    control = dict(raw["control"])
-    for key in ("Q", "R", "R_kalman"):
-        control[key] = np.array(control[key], dtype=np.float64)
-    return {
-        "seed": int(raw["seed"]),
-        "t_final": float(raw["t_final"]),
-        "State0": list(raw["State0"]),
-        "params": params,
-        "control": control,
-    }
 
 def pack(array):
     return np.ascontiguousarray(array, dtype=np.float64)
@@ -145,22 +98,6 @@ def fingerprint(t, x, u):
     for j, name in enumerate(COMMAND_NAMES):
         channels[name] = sha256(u[:, j])
     return bundle, channels
-
-def fly(spec):
-    spec = spec_from_json(spec_to_json(spec))
-    params = spec["params"]
-    sim = RocketSim(params)
-    controls = Controls(params, spec["control"])
-    runner = Runner(sim, controls)
-    # Seed immediately before solve. The runner and the controller share this sequence.
-    np.random.seed(spec["seed"])
-    runner.solve(State0=list(spec["State0"]))
-    t = pack(runner.timestamps_cache[0])
-    x = pack(runner.states_cache[0])
-    u = pack(runner.controls_cache[0])
-    if x.shape[0] != len(STATE_NAMES) or u.ndim != 2 or u.shape[1] != len(COMMAND_NAMES):
-        raise RuntimeError(f"unexpected log shapes t={t.shape} x={x.shape} u={u.shape}")
-    return t, x, u
 
 def load_versions():
     if not VERSIONS_PATH.exists():
@@ -201,8 +138,7 @@ def record(name):
     if find_version(document, name) is not None:
         print(f"{name} already exists", file=sys.stderr)
         return 1
-    spec = default_spec()
-    t, x, u = fly(spec)
+    t, x, u = fly()
     bundle, channels = fingerprint(t, x, u)
     entry = {
         "version": name,
@@ -210,7 +146,7 @@ def record(name):
         "date": date.today().isoformat(),
         "note": "seeded 2 second flight, theta0 = psi0 = 0.05",
         "packages": package_versions(),
-        "spec": spec_to_json(spec),
+        "PARAMETERS": PARAMETERS,
         "bundle": bundle,
         "channels": channels,
     }
@@ -290,8 +226,17 @@ def check():
     if entry is None:
         print("no current baseline", file=sys.stderr)
         return 1
-    spec = spec_from_json(entry["spec"])
-    t, x, u = fly(spec)
+    
+    sim = RocketSim(PARAMETERS)
+    controls = Controls(PARAMETERS, PARAMETERS)
+    runner = Runner(controls, sim)
+    # Seed immediately before solve. The runner and the controller share this sequence.
+    np.random.seed(PARAMETERS["seed"])
+    runner.solve(State0=PARAMETERS["State0"])
+    t = pack(runner.timestamps_cache[0])
+    x = pack(runner.states_cache[0])
+    u = pack(runner.controls_cache[0])
+
     bundle, channels = fingerprint(t, x, u)
     if bundle == entry["bundle"]:
         if MISMATCH_PATH.exists():
@@ -315,5 +260,5 @@ def main(argv):
     print("usage: run.py check | run.py record <version>", file=sys.stderr)
     return 2
 
-# if __name__ == "__main__":
-#     sys.exit(main(sys.argv))
+if __name__ == "__main__":
+    sys.exit(main(sys.argv))
