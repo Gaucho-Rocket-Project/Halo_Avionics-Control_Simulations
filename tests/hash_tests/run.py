@@ -51,7 +51,6 @@ CONTROL = {
     "R_kalman": np.diag([1, 1, 1, 1, 1, 1]) * 1e-5,
     "control_frequency": 15, # control frequency, dt = 1 / frequency 
 }
-
 # All the numerical parameters needed for the simulation
 PARAMS = {
     #Class parameters
