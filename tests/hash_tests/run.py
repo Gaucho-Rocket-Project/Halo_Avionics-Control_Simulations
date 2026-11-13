@@ -224,7 +224,7 @@ def fly():
     controls = Controls(PARAMETERS, PARAMETERS)
     runner = Runner(controls, sim)
     # Seed immediately before solve. The runner and the controller share this sequence.
-    np.random.seed(PARAMETERS["seed"])
+    np.random.seed(PARAMETERS["seed"]) # set's the seed for all np.random calls in this subprocess
     runner.solve(State0=PARAMETERS["State0"])
     t = pack(runner.timestamps_cache[0])
     x = pack(runner.states_cache[0])

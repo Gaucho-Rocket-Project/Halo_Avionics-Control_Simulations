@@ -12,6 +12,7 @@ class RocketSim:
 
     # lambda turning a state into an input matrix
     control_algo: None | Any = None
+
     timestamps_cache = []
     control_times_chache = []
     states_cache = []

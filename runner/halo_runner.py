@@ -14,7 +14,7 @@ from scipy.integrate import BDF
 
 
 class Runner:
-    def __init__(self, sim, controls):
+    def __init__(self, controls, sim):
         self.sim = sim
         self.controls = controls
         self.clear_cache()

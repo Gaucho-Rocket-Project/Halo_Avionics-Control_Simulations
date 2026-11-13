@@ -88,7 +88,7 @@ class Controls():
 
         #Set control parameters
         gamma, delta_P = -self.K @ [x_hat, z_hat-self.z_ref(t_hat), dx_hat, dz_hat-self.dz_ref(t_hat), theta_hat, dtheta_hat]
-        P_hover = 1 - self.rocket_sim_instance.m0 * self.rocket_sim_instance.g / self.rocket_sim_instance.T
+        P_hover = 1 - self.vehicle["m0"] * self.vehicle["g"] / self.vehicle["T"]
         P = P_hover + delta_P
 
         # P_feedforward = 1 - m * (g + ddz_ref(t)) / T
@@ -100,7 +100,7 @@ class Controls():
         #max throttle rate
         dP = P-P0
         P = P0 + np.clip((dP/self.dt),-0.5,0.5)*self.dt / bP #update P with damping
-        P = np.clip(P,0,self.rocket_sim_instance.P_max) #min/max throttle
+        P = np.clip(P,0,self.vehicle["P_max"]) #min/max throttle
 
         #Gimbal
         bgamma = 1.0 #gimbal damping
@@ -126,8 +126,8 @@ class Controls():
 
     #Roll control (subject to change)
     def Roll_control(self, psi, dpsi, f_prev):
-        ta = ( (self.Izz/self.rocket_sim_instance.Tau0) * dpsi * np.sign(psi) + np.sqrt( (self.Izz/self.rocket_sim_instance.Tau0) * np.abs(psi) + 0.5 * (((self.Izz/self.rocket_sim_instance.Tau0) * dpsi) ** 2) ) )
-        tb = ( (self.Izz/self.rocket_sim_instance.Tau0) * dpsi * np.sign(psi) + 2 * np.sqrt( (self.Izz/self.rocket_sim_instance.Tau0) * np.abs(psi) + 0.5 * (((self.Izz/self.rocket_sim_instance.Tau0) * dpsi) ** 2) ) )
+        ta = ( (self.Izz/self.vehicle["Tau0"]) * dpsi * np.sign(psi) + np.sqrt( (self.Izz/self.vehicle["Tau0"]) * np.abs(psi) + 0.5 * (((self.Izz/self.vehicle["Tau0"]) * dpsi) ** 2) ) )
+        tb = ( (self.Izz/self.vehicle["Tau0"]) * dpsi * np.sign(psi) + 2 * np.sqrt( (self.Izz/self.vehicle["Tau0"]) * np.abs(psi) + 0.5 * (((self.Izz/self.vehicle["Tau0"]) * dpsi) ** 2) ) )
         k=0.45
         e_on = 0.01
         e_off = e_on * 0.3
@@ -166,7 +166,7 @@ class Controls():
 
             kalman_state_x, kalman_state_y, kalman_roll, kalman_cov_x, kalman_cov_y = control_state_prev
             P, gx, gy, f = u_prev
-            P_hover = 1 - self.rocket_sim_instance.m0 * self.rocket_sim_instance.g / self.rocket_sim_instance.T
+            P_hover = 1 - self.vehicle["m0"] * self.vehicle["g"] / self.vehicle["g"]
 
             #Kalman filter
             aposteriori_state_x, aposteriori_covariance_x = self.Kalman_Filter(observed_state_x, kalman_state_x *np.array([1,1,1,1,-1,-1]), kalman_cov_x, [gy, P-P_hover])
