@@ -219,14 +219,7 @@ def write_mismatch(saved, new):
                     row += ["", "", ""]
             writer.writerow(row)
 
-def check():
-    document = load_versions()
-    name = document.get("current")
-    entry = find_version(document, name) if name else None
-    if entry is None:
-        print("no current baseline", file=sys.stderr)
-        return 1
-    
+def fly():
     sim = RocketSim(PARAMETERS)
     controls = Controls(PARAMETERS, PARAMETERS)
     runner = Runner(controls, sim)
@@ -236,6 +229,17 @@ def check():
     t = pack(runner.timestamps_cache[0])
     x = pack(runner.states_cache[0])
     u = pack(runner.controls_cache[0])
+    return t, x, u
+
+def check():
+    document = load_versions()
+    name = document.get("current")
+    entry = find_version(document, name) if name else None
+    if entry is None:
+        print("no current baseline", file=sys.stderr)
+        return 1
+    
+    t, x, u = fly()
 
     bundle, channels = fingerprint(t, x, u)
     if bundle == entry["bundle"]:
