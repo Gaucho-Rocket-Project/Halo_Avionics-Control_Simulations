@@ -9,12 +9,8 @@ import numpy as np
 import scipy as sp
 from control import lqr
 
-
 class Controls():
-    def __init__(self, vehicle, control):
-        self.set_params(control, vehicle)
-
-    def set_params(self, control, vehicle):
+    def __init__(self, control, vehicle):
         self.vehicle = vehicle
         self.H = control["H"]
         self.V = control["V"]

@@ -1,22 +1,31 @@
-These notebooks simulate the trajectory of the rocket (position and angle data) with given parameters.
+# Halo Avionics-Control Simulations
 
--RocketSimPID.ipynb simulates a trajectory using PID control and functions well. I used an optimization algorithm to find optimal PID coefficients.
--RocketSim2DLQR(1,2 and 3).ipynb simulate a trajectory using LQR control (state space) for a 2D rocket model for ascent, hovering, and descent
--RocketSim3DLQR(1,2 and 3).ipynb simulate a trajectory using LQR control (state space) for a 3D rocket model for ascent, hovering, and descent
+Code for simulating the trajectories of Halo and Halo Jr. under different control algorithms.
 
-The methods of control I assume are the two TVC gimbal angles (which I denote gamma_x and gamma_y for angles about the x and y axis respectively) and the percentage of thrust that is throttled (P).
+## Dashboard
 
-Data still needed:
--Mass of rocket and fuel
--Rate of mass flow
--Drag coefficient (Nose cone geometry)
--Cross sectional area (top down view)
--Inertia matrix
--Rate of Inertia matrix
--Distance between Center of Mass and Center of Pressure
--Distance between Center of Mass and Nozzle
--TVC angle range
--TVC angle maximum rate
--Thrust throttle range
--Thrust throttle maximum rate
--Thrust Curve (force vs. time)
+From the directory RocketSim, run:
+
+```bash
+python dashboard.py
+```
+
+Open the local address printed in the terminal to configure a flight and view its 3D animation, trajectory, and telemetry.
+
+![Dashboard showing a rocket flight](../RocketSim/dashboard/dashboard.png)
+
+Visual inspired by https://github.com/aryamehr2k/rocket-landing-rl-simulator.
+
+## RocketSim.py
+
+RocketSim.py defines the rocket’s flight physics and the Controls class. The physics model evolves position, velocity, orientation, angular velocity, and mass while accounting for thrust, aerodynamics, gravity, wind, and gusts.
+
+Controls implements LQR guidance for thrust and gimbal commands, a Kalman filter for state estimation, and roll control for a cold-gas thruster based reaction control system. Simulation runs cache their timestamps, states, and control commands for plotting and playback.
+
+## RocketSimTest2.ipynb
+
+Use this notebook to set rocket and controller parameters, run individual flights, and plot their trajectories and control commands. It also contains examples of optimizing LQR weights and trajectory parameters against flight performance objectives.
+
+## RocketSim3DLQRKalmanAero.ipynb
+
+This notebook derives the three-dimensional rocket dynamics used by the simulator, including aerodynamic effects. A markdown cell includes LaTeX equations of the derivation.
