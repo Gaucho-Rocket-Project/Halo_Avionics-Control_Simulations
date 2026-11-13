@@ -60,90 +60,105 @@ class Controls():
         self.K = lqr(self.Atc, self.Btc, self.Q, self.R)[0]
 
     def z_ref(self, t):
-        if t < self.x1:
-            return 0.5 * self.Z * (t ** 2)
-        elif (t > self.x1) and (t < self.x2):
-            return self.V * (t - self.x1) + 0.5 * self.Z * (self.x1 ** 2)
-        elif (t > self.x2) and (t < self.Ti):
-            return -self.X * ((t - self.Ti) ** 2) + self.H
-        elif (t > self.Ti) and (t < self.x4):
+        if t< self.x1:
+            return 0.5 * self.Z * (t **2)
+        elif (t>self.x1) and (t<self.x2):
+            return self.V * (t- self.x1) + 0.5 * self.Z * (self.x1 **2)
+        elif (t>self.x2) and (t<self.Ti):
+            return -self.X * ((t-self.Ti) **2) + self.H
+        elif (t>self.Ti) and (t<self.x4):
             return self.H
-        elif (t > self.x4) and (t < self.x5):
-            return -self.X * ((t - self.x4) ** 2) + self.H
-        elif (t > self.x5) and (t < self.x6):
-            return -self.V * (t - self.x5) + self.H - self.X * ((self.x5 - self.x4) ** 2)
-        elif (t > self.x6) and (t < self.Tf):
-            return self.Y * ((t - self.Tf) ** 2)
+        elif (t>self.x4) and (t<self.x5):
+            return -self.X * ((t-self.x4) ** 2) + self.H
+        elif (t>self.x5) and (t<self.x6):
+            return -self.V * (t-self.x5) + self.H -self.X * ((self.x5-self.x4) ** 2)
+        elif (t>self.x6) and (t<self.Tf):
+            return self.Y * ((t-self.Tf) ** 2)
         else:
             return 0
 
     def dz_ref(self, t):
-        return (self.z_ref(t + 0.001) - self.z_ref(t)) / 0.001
+        return (self.z_ref(t+0.001) - self.z_ref(t)) / 0.001
+    
 
+    #LQR takes in estimated state and outputs gimbal and throttle controls
     def LQR(self, t_hat, State_hat, u):
         x_hat, z_hat, dx_hat, dz_hat, theta_hat, dtheta_hat = State_hat
         gamma0, P0 = u
 
-        gamma, P = -self.K @ [x_hat, z_hat-self.z_ref(t_hat), dx_hat, dz_hat-self.dz_ref(t_hat), theta_hat, dtheta_hat]
+        #Set control parameters
+        gamma, delta_P = -self.K @ [x_hat, z_hat-self.z_ref(t_hat), dx_hat, dz_hat-self.dz_ref(t_hat), theta_hat, dtheta_hat]
+        P_hover = 1 - self.rocket_sim_instance.m0 * self.rocket_sim_instance.g / self.rocket_sim_instance.T
+        P = P_hover + delta_P
 
-        bP = 1.0
+        # P_feedforward = 1 - m * (g + ddz_ref(t)) / T
+        # P = P_feedforward + delta_P
+
+        #Control limits
+        #Throttle
+        bP=1.0 #damping
+        #max throttle rate
         dP = P-P0
-        P = P0 + np.clip((dP/self.dt), -0.5, 0.5)*self.dt / bP
-        P = np.clip(P, 0, self.vehicle["P_max"])
+        P = P0 + np.clip((dP/self.dt),-0.5,0.5)*self.dt / bP #update P with damping
+        P = np.clip(P,0,self.rocket_sim_instance.P_max) #min/max throttle
 
-        bgamma = 1.0
+        #Gimbal
+        bgamma = 1.0 #gimbal damping
+        #max gimbal rate
         dgamma = gamma-gamma0
-        gamma = gamma0 + np.clip((dgamma/self.dt), -0.5, 0.5)*self.dt / bgamma
-        gamma = np.clip(gamma, -0.22, 0.22)
+        gamma = gamma0 + np.clip((dgamma/self.dt),-0.5, 0.5)*self.dt / bgamma #update P with damping
+        gamma = np.clip(gamma, -0.22, 0.22) #min/max gimbal
 
-        return [gamma, P]
+        return [gamma, P]#, np.clip((dgamma/self.dt),-0.5, 0.55), np.clip((dP/self.dt),-0.5,0.5)]
 
+
+
+    #Kalman filter takes in observed state and uncertainty and outputs estimated state
     def Kalman_Filter(self, observed_state, kalman_state, kalman_covariance, u):
         apriori_state = self.Atd@kalman_state + self.Btd@u
         apriori_covariance = self.Atd@kalman_covariance@self.Atd.T + self.Q_d
-        kalman_gain = (apriori_covariance) @ np.linalg.inv(apriori_covariance + self.R_d)
-
+        kalman_gain = (apriori_covariance) @np.linalg.inv(apriori_covariance + self.R_d)
+            
         aposteriori_state = apriori_state + kalman_gain@(observed_state - apriori_state)
         aposteriori_covariance = (np.identity(6) - kalman_gain)@apriori_covariance@(np.identity(6) - kalman_gain).T + kalman_gain@self.R_d@kalman_gain.T
 
         return [aposteriori_state, aposteriori_covariance]
 
+    #Roll control (subject to change)
     def Roll_control(self, psi, dpsi, f_prev):
-        ta = ( (self.Izz/self.vehicle["Tau0"]) * dpsi * np.sign(psi) + np.sqrt( (self.Izz/self.vehicle["Tau0"]) * np.abs(psi) + 0.5 * (((self.Izz/self.vehicle["Tau0"]) * dpsi) ** 2) ) )
-        tb = ( (self.Izz/self.vehicle["Tau0"]) * dpsi * np.sign(psi) + 2 * np.sqrt( (self.Izz/self.vehicle["Tau0"]) * np.abs(psi) + 0.5 * (((self.Izz/self.vehicle["Tau0"]) * dpsi) ** 2) ) )
-        k = 2
-        e_on = 0.02
-        e_off = 0.02 * 0.3
+        ta = ( (self.Izz/self.rocket_sim_instance.Tau0) * dpsi * np.sign(psi) + np.sqrt( (self.Izz/self.rocket_sim_instance.Tau0) * np.abs(psi) + 0.5 * (((self.Izz/self.rocket_sim_instance.Tau0) * dpsi) ** 2) ) )
+        tb = ( (self.Izz/self.rocket_sim_instance.Tau0) * dpsi * np.sign(psi) + 2 * np.sqrt( (self.Izz/self.rocket_sim_instance.Tau0) * np.abs(psi) + 0.5 * (((self.Izz/self.rocket_sim_instance.Tau0) * dpsi) ** 2) ) )
+        k=0.45
+        e_on = 0.01
+        e_off = e_on * 0.3
         if f_prev == 0:
-            if abs(psi+k*dpsi) > e_on:
-                if np.ceil(ta/(self.dt*1))*(self.dt*1) > 0:
+            if abs(psi+k*dpsi)> e_on:
+                if np.ceil(ta/(self.dt*1))*(self.dt*1)>0:
                     f = -np.sign(psi)
-                elif np.ceil(tb/(self.dt*1))*(self.dt*1) > 0:
+                elif np.ceil(tb/(self.dt*1))*(self.dt*1)>0:
                     f = np.sign(psi)
                 else:
                     f = 0
             else:
-                f = 0
+                f= 0
         else:
-            if abs(psi+k*dpsi) < e_off:
-                f = 0
+            if abs(psi+k*dpsi)< e_off:
+                f=0
             else:
-                if np.ceil(ta/(self.dt*1))*(self.dt*1) > 0:
+                if np.ceil(ta/(self.dt*1))*(self.dt*1)>0:
                     f = -np.sign(psi)
-                elif np.ceil(tb/(self.dt*1))*(self.dt*1) > 0:
+                elif np.ceil(tb/(self.dt*1))*(self.dt*1)>0:
                     f = np.sign(psi)
                 else:
                     f = 0
         return f
-
+    
     def LQR_control_algo(self, t, state, control_t_prev, control_state_prev, u_prev):
-        # Hold the previous command until one control period (dt) has passed.
-        if (t - control_t_prev > self.dt):
-            # Planar measurements taken from the 13-state vector.
-            # x-z uses x, z, dx, dz, theta, dtheta. y-z uses y, z, dy, dz, phi, dphi.
-            observed_state_x = [state[i] for i in [0, 2, 3, 5, 7, 10]] * np.array([1, 1, 1, 1, -1, -1])
-            observed_state_y = [state[i] for i in [1, 2, 4, 5, 6, 9]] * np.array([-1, 1, -1, 1, -1, -1])
-            observed_roll = [state[i] for i in [8, 11]]
+        if (t - control_t_prev >= self.dt - 1e-10):
+            #Measurement
+            observed_state_x = [state[i] for i in [0,2,3,5,7,10]] * np.array([1,1,1,1,-1,-1])
+            observed_state_y = [state[i] for i in [1,2,4,5,6,9]] * np.array([-1,1,-1,1,-1,-1])
+            observed_roll = [state[i] for i in [8,11]]
 
             v = np.random.multivariate_normal(np.zeros(6), self.R_kalman)
             observed_state_x += self.R_d@v
@@ -151,27 +166,40 @@ class Controls():
 
             kalman_state_x, kalman_state_y, kalman_roll, kalman_cov_x, kalman_cov_y = control_state_prev
             P, gx, gy, f = u_prev
+            P_hover = 1 - self.rocket_sim_instance.m0 * self.rocket_sim_instance.g / self.rocket_sim_instance.T
 
-            aposteriori_state_x, aposteriori_covariance_x = self.Kalman_Filter(observed_state_x, kalman_state_x, kalman_cov_x, [gy, P])
-            aposteriori_state_x = aposteriori_state_x * np.array([1, 1, 1, 1, -1, -1])
+            #Kalman filter
+            aposteriori_state_x, aposteriori_covariance_x = self.Kalman_Filter(observed_state_x, kalman_state_x *np.array([1,1,1,1,-1,-1]), kalman_cov_x, [gy, P-P_hover])
+            aposteriori_state_x = aposteriori_state_x * np.array([1,1,1,1,-1,-1])
             kalman_state_x = aposteriori_state_x
             kalman_cov_x = aposteriori_covariance_x
 
-            aposteriori_state_y, aposteriori_covariance_y = self.Kalman_Filter(observed_state_y, kalman_state_y, kalman_cov_y, [gx, P])
-            aposteriori_state_y = aposteriori_state_y * np.array([-1, 1, -1, 1, -1, -1])
+            aposteriori_state_y, aposteriori_covariance_y = self.Kalman_Filter(observed_state_y, kalman_state_y * np.array([-1,1,-1,1,-1,-1]), kalman_cov_y, [gx, P-P_hover])
+            aposteriori_state_y = aposteriori_state_y * np.array([-1,1,-1,1,-1,-1])
             kalman_state_y = aposteriori_state_y
             kalman_cov_y = aposteriori_covariance_y
 
-            gy, P1 = self.LQR(t, kalman_state_x * np.array([1, 1, 1, 1, -1, -1]), [gy, P])
-            gx, P2 = self.LQR(t, kalman_state_y * np.array([-1, 1, -1, 1, -1, -1]), [gx, P])
+
+            #LQR
+            gy, P1 = self.LQR(t, kalman_state_x * np.array([1,1,1,1,-1,-1]), [gy, P])
+            gx, P2 = self.LQR(t, kalman_state_y * np.array([-1,1,-1,1,-1,-1]), [gx, P])
             P = (P1+P2)/2
 
+            #Roll control
             kalman_roll = np.array(observed_roll)
             psi = observed_roll[0]
             dpsi = observed_roll[1]
             f = self.Roll_control(psi, dpsi, f)
 
+            if t>self.Tf: 
+                P, gx, gy, f = 1, 0, 0, 0
+
             return [[t, kalman_state_x, kalman_state_y, kalman_roll, kalman_cov_x, kalman_cov_y], [P, gx, gy, f]]
         else:
             kalman_state_x, kalman_state_y, kalman_roll, kalman_cov_x, kalman_cov_y = control_state_prev
             return [[control_t_prev, kalman_state_x, kalman_state_y, kalman_roll, kalman_cov_x, kalman_cov_y], u_prev]
+    
+    #x, y, z, dx, dy, dz, phi, theta, psi, dphi, dtheta, dpsi, m = (state)
+    #P, gx, gy, f = self.controls_cache[-1][-1]
+    #t, State_x_hat, State_y_hat, Cov_x, Cov_y = X
+    #X, u = self.control_algo(solver.t, solver.y, control_times[-1], self.control_states_cache[-1], self.controls_cache[-1])

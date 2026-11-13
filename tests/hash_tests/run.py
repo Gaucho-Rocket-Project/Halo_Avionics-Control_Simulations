@@ -37,19 +37,8 @@ STATE_NAMES = [
 ]
 COMMAND_NAMES = ["P", "gx", "gy", "f"]
 
-PARAMS = {
-    "T": 3000,
-    "P_max": 0.4,
-    "m0": 285,
-    "m_dot": 1.75,
-    "dNoz": 0.7,
-    "t_final": 2.0,
-    "l": 2.5,
-    "r": 0.2,
-    "Tau0": 3.23,
-    "g": 9.8,
-    "Q_kalman": np.diag([1e-10, 1e-10, 1e-5, 1e-5, 1e-10, 1e-7]),
-}
+# All the numerical parameters for control
+# control also needs sim_params
 CONTROL = {
     "H": 50.0,
     "V": 4.0,
@@ -60,9 +49,39 @@ CONTROL = {
     "Q": np.diag([0.1, 350, 0.1, 320, 20, 50]),
     "R": np.diag([2000, 1536]),
     "R_kalman": np.diag([1, 1, 1, 1, 1, 1]) * 1e-5,
-    "control_frequency": 15,
+    "control_frequency": 15, # control frequency, dt = 1 / frequency 
 }
 
+# All the numerical parameters needed for the simulation
+PARAMS = {
+    #Class parameters
+    "T" : 3000,                   #Max thrust
+    "P_max" : 0.4,               #Max throttle percentage
+    "m0" : 285,                  #Initial mass
+    "m_dot" : 1.75,               #Mass flow at max thrust
+    "g" : 9.8,                     #Gravity
+    "dNoz" : 0.7,                #Distance from CoM to Nozzle
+    "t_final" : 65,             #Final simulation time
+    "l" : 2.5,                   #Effective length
+    "r" : 0.2,                   #Effective radius
+    "Tau0" : 3.23,                #RCS torque magnitude
+    "Cd0" : 0.8,                 #Coeff of drag NOTE: ADD THIS TO halo_control script (it's only here right now)
+
+    "Cl0" : 6.28,                 #Coeff of lift
+    "S0" : 0.126,                  #Reference area
+    "dCoP" : 1,                #Distance from CoM to Center of Pressure
+    "rho" : 1.225,                 #Density of air
+    "State0" : [0,0,0,
+                0,0,0,
+                0,0,0,
+                0,0,0],
+    "wind_speed" : 0.0,          #Steady horizontal wind magnitude
+    "wind_direction" : 0.0,      #Wind direction from +x toward +y (radians)
+    "gust_variance" : 0.0,       #Variance of each horizontal gust component
+    "wind_seed" : None,
+    "position_variance" : 1e-10,
+    "velocity_variance" : 1e-5,
+}
 
 def default_spec():
     params = dict(PARAMS)
@@ -77,7 +96,6 @@ def default_spec():
         "params": params,
         "control": control,
     }
-
 
 def spec_to_json(spec):
     params = dict(spec["params"])
@@ -94,7 +112,6 @@ def spec_to_json(spec):
         "control": control,
     }
 
-
 def spec_from_json(raw):
     params = dict(raw["params"])
     params["Q_kalman"] = np.array(params["Q_kalman"], dtype=np.float64)
@@ -110,14 +127,11 @@ def spec_from_json(raw):
         "control": control,
     }
 
-
 def pack(array):
     return np.ascontiguousarray(array, dtype=np.float64)
 
-
 def sha256(array):
     return hashlib.sha256(pack(array).tobytes()).hexdigest()
-
 
 def fingerprint(t, x, u):
     t = pack(t)
@@ -130,7 +144,6 @@ def fingerprint(t, x, u):
     for j, name in enumerate(COMMAND_NAMES):
         channels[name] = sha256(u[:, j])
     return bundle, channels
-
 
 def fly(spec):
     spec = spec_from_json(spec_to_json(spec))
@@ -148,19 +161,16 @@ def fly(spec):
         raise RuntimeError(f"unexpected log shapes t={t.shape} x={x.shape} u={u.shape}")
     return t, x, u
 
-
 def load_versions():
     if not VERSIONS_PATH.exists():
         return {"current": None, "versions": []}
     with VERSIONS_PATH.open() as handle:
         return json.load(handle)
 
-
 def save_versions(document):
     with VERSIONS_PATH.open("w") as handle:
         json.dump(document, handle, indent=2)
         handle.write("\n")
-
 
 def git_head():
     try:
@@ -169,7 +179,6 @@ def git_head():
         ).strip()
     except (subprocess.CalledProcessError, FileNotFoundError):
         return ""
-
 
 def package_versions():
     import control
@@ -180,13 +189,11 @@ def package_versions():
         "python-control": control.__version__,
     }
 
-
 def find_version(document, name):
     for entry in document["versions"]:
         if entry["version"] == name:
             return entry
     return None
-
 
 def record(name):
     document = load_versions()
@@ -215,12 +222,10 @@ def record(name):
     print(bundle)
     return 0
 
-
 def fmt(value):
     if value is None:
         return ""
     return format(float(value), ".16g")
-
 
 def column_pairs(saved, new):
     same_length = saved.shape == new.shape
@@ -232,7 +237,6 @@ def column_pairs(saved, new):
         diff = (s - n) if same_length else None
         paired.append((s, n, diff))
     return paired
-
 
 def write_mismatch(saved, new):
     t_s, x_s, u_s = saved
@@ -278,7 +282,6 @@ def write_mismatch(saved, new):
                     row += ["", "", ""]
             writer.writerow(row)
 
-
 def check():
     document = load_versions()
     name = document.get("current")
@@ -303,7 +306,6 @@ def check():
         print("moved: " + ", ".join(moved))
     return 1
 
-
 def main(argv):
     if len(argv) >= 2 and argv[1] == "check" and len(argv) == 2:
         return check()
@@ -311,7 +313,6 @@ def main(argv):
         return record(argv[2])
     print("usage: run.py check | run.py record <version>", file=sys.stderr)
     return 2
-
 
 if __name__ == "__main__":
     sys.exit(main(sys.argv))
