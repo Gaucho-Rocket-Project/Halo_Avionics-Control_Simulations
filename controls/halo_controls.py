@@ -166,7 +166,7 @@ class Controls():
 
             kalman_state_x, kalman_state_y, kalman_roll, kalman_cov_x, kalman_cov_y = control_state_prev
             P, gx, gy, f = u_prev
-            P_hover = 1 - self.vehicle["m0"] * self.vehicle["g"] / self.vehicle["g"]
+            P_hover = 1 - self.vehicle["m0"] * self.vehicle["g"] / self.vehicle["T"]
 
             #Kalman filter
             aposteriori_state_x, aposteriori_covariance_x = self.Kalman_Filter(observed_state_x, kalman_state_x *np.array([1,1,1,1,-1,-1]), kalman_cov_x, [gy, P-P_hover])

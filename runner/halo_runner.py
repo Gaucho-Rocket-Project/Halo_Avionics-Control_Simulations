@@ -1,16 +1,15 @@
 """Closed-loop runner. One accepted integrator step, then the controller.
 
-The BDF solver still takes its own internal substeps inside `solver.step()`.
-This loop does not call the controller on those substeps. The command returned
-here is stored on the plant and is used on the next step.
-
-BDF : backward differentiation formula, it is the numerical method this simulation uses
-to integrate the rockets equations of motion forward in time.
+RK45 takes its own internal substeps inside `solver.step()`. This loop does
+not call the controller on those substeps. `max_step` keeps each accepted
+step from passing the next control time. The command is stored on the plant
+and is used on the next step.
 """
+import time
 
 import matplotlib.pyplot as plt
 import numpy as np
-from scipy.integrate import BDF
+from scipy.integrate import RK45
 
 
 class Runner:
@@ -22,7 +21,8 @@ class Runner:
     def solve(self, State0=None):
         if State0 is None:
             State0 = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, self.sim.params["m0"]]
-        initial_command = [0, 0, 0, 0]
+       
+        initial_command = [1 - (self.sim.params["m0"] * self.sim.params["g"] / self.sim.params["T"]), 0, 0, 0]
         self.controls_cache.append([initial_command])
         self.sim.command = initial_command
         control_times = [0]
@@ -38,15 +38,25 @@ class Runner:
         timestamps = []
         states = []
         status = 0
-        solver = BDF(self.sim.update, 0, State0, self.sim.params["t_final"])
+        # RK45 is adaptive. max_step limits its steps, and the distance to the
+        # next control tick makes it land on every scheduled update time.
+        max_physics_step = self.controls.dt / 10
+        control_tick = 1
+        next_control_time = min(control_tick * self.controls.dt, self.sim.params["t_final"])
+        time_tolerance = 1e-10 * max(1.0, self.sim.params["t_final"])
+        start_time = time.time()
+        solver = RK45(self.sim.update, 0, State0, self.sim.params["t_final"], max_step=max_physics_step)
         while solver.status == "running":
+            remaining = next_control_time - solver.t
+            if remaining <= time_tolerance:
+                control_tick += 1
+                next_control_time = min(control_tick * self.controls.dt, self.sim.params["t_final"])
+                remaining = next_control_time - solver.t
+            solver.max_step = min(max_physics_step, remaining)
             solver.step()
-
-            w_x = np.random.multivariate_normal(np.zeros(6), self.sim.params["Q_kalman"])
-            w_y = np.random.multivariate_normal(np.zeros(6), self.sim.params["Q_kalman"])
-            w_psi = np.random.normal(0, 0.1)
-            w = np.array([w_x[0], w_y[0], (w_x[1]+w_y[1])/2, w_x[2], w_y[2], (w_x[3]+w_y[3])/2, w_y[4], w_x[4], 0, w_y[5], w_x[5], w_psi, 0])
-            solver.y = solver.y + w*(solver.t - solver.t_old)
+            if solver.status == "failed":
+                status = 3
+                break
 
             timestamps.append(solver.t)
             states.append(solver.y.copy())
@@ -61,8 +71,19 @@ class Runner:
             self.control_states_cache[-1].append([kalman_states_x[-1], kalman_states_y[-1], kalman_roll[-1], kalman_cov_x[-1], kalman_cov_y[-1]])
             self.controls_cache[-1].append(u)
             self.sim.command = u
+            # RK45 reuses the derivative from the end of its previous step.
+            # Re-evaluate it after the command changes.
+            if solver.status == "running":
+                solver.f = solver.fun(solver.t, solver.y)
+            if solver.t >= next_control_time - time_tolerance:
+                control_tick += 1
+                next_control_time = min(control_tick * self.controls.dt, self.sim.params["t_final"])
 
-            if states[-1][2] < 0:
+            if time.time() - start_time > 10:
+                solver.status = "stopped"
+                status = 1
+                break
+            if states[-1][2] < 0 and solver.t > 1:
                 solver.status = "stopped"
                 status = 2
                 break
@@ -74,6 +95,7 @@ class Runner:
         self.states_cache.append(states)
         self.timestamps_cache.append(timestamps)
         self.control_times_cache.append(control_times)
+        self.controls_cache[-1] = np.array(self.controls_cache[-1]).T
         self.status_cache.append(status)
 
     def plot_cache(self, labels=["", "", "", "", "", ""], interval=(0, 0)):
