@@ -1,5 +1,5 @@
 {
-  "current": "2",
+  "current": "1.0",
   "versions": [
     {
       "version": "1.0",
@@ -232,22 +232,6 @@
         "gy": "d5a7f3f62088a682e29e7a29a5f1b0dde9c4bdf0df54156f1aba158b109abd3f",
         "f": "0059ee10b60530f90dbee36c0f939f6724dd242cbcb89aaebb61cbf88e2e07c4"
       }
-    },
-    {
-      "version": "2",
-      "commit": "5e23672a46ab5c805bd5cfe8ecd3a9552263e8aa",
-      "date": "2026-11-13",
-      "note": "seeded 2 second flight, theta0 = psi0 = 0.05",
-      "packages": {
-        "numpy": "2.5.4",
-        "scipy": "1.18.1",
-        "python-control": "0.10.2"
-      },
-      "PARAMETERS": {
-        "H": 50.0,
-        "V": 4.0,
-        "Ti": 21.0,
-        "Th": 10.0,
-        "Tf": 54.0,
-        "Z": 0.83,
-        "Q": 
+    }
+  ]
+}
