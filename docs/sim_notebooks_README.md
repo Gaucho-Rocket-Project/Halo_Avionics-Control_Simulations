@@ -4,7 +4,7 @@ Code for simulating the trajectories of Halo and Halo Jr. under different contro
 
 ## Dashboard
 
-From the directory RocketSim, run:
+From the repository root, run:
 
 ```bash
 python dashboard.py
@@ -12,7 +12,7 @@ python dashboard.py
 
 Open the local address printed in the terminal to configure a flight and view its 3D animation, trajectory, and telemetry.
 
-![Dashboard showing a rocket flight](../RocketSim/dashboard/dashboard.png)
+![Dashboard showing a rocket flight](../dashboard/dashboard.png)
 
 Visual inspired by https://github.com/aryamehr2k/rocket-landing-rl-simulator.
 
