@@ -1,8 +1,12 @@
-"""Record one hash of nominal, wind, and gust, or check it and print True or False."""
+"""Record the flight hash and its date, or check it and print True or False.
+
+`record` replaces the saved hash only when the new flight hash is different.
+"""
 
 import hashlib
 import json
 import sys
+from datetime import date
 from pathlib import Path
 
 import numpy as np
@@ -89,35 +93,21 @@ def save_versions(document):
         handle.write("\n")
 
 
-def find_version(document, name):
-    for entry in document["versions"]:
-        if entry["version"] == name:
-            return entry
-    return None
-
-
-def record(name):
-    document = load_versions()
-    if find_version(document, name) is not None:
-        print(f"{name} already exists", file=sys.stderr)
-        return 1
-    entry = {"version": name, "hash": fly()}
-    document["versions"].append(entry)
-    document["current"] = name
-    save_versions(document)
-    print(entry["hash"])
+def record():
+    new_hash = fly()
+    if VERSIONS_PATH.exists() and load_versions().get("hash") == new_hash:
+        print("hash already equals current hash in versions.json")
+        return 0
+    save_versions({"hash": new_hash, "date": date.today().isoformat()})
+    print(True)
     return 0
 
 
 def check():
-    document = load_versions()
-    name = document.get("current")
-    entry = find_version(document, name) if name else None
-    if entry is None:
+    if not VERSIONS_PATH.exists():
         print("no current baseline", file=sys.stderr)
         return 1
-    saved = entry["hash"] if "hash" in entry else entry["bundle"]
-    same = fly() == saved
+    same = fly() == load_versions()["hash"]
     print(same)
     return 0 if same else 1
 
@@ -125,9 +115,9 @@ def check():
 def main(argv):
     if len(argv) == 2 and argv[1] == "check":
         return check()
-    if len(argv) == 3 and argv[1] == "record":
-        return record(argv[2])
-    print("usage: run.py check | run.py record <version>", file=sys.stderr)
+    if len(argv) == 2 and argv[1] == "record":
+        return record()
+    print("usage: run.py check | run.py record", file=sys.stderr)
     return 2
 
 
