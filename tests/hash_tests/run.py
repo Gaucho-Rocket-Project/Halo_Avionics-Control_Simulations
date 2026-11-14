@@ -1,4 +1,4 @@
-"""Record one flight hash, or check the current hash and print True or False."""
+"""Record one hash of nominal, wind, and gust, or check it and print True or False."""
 
 import hashlib
 import json
@@ -18,7 +18,7 @@ from simulation.halo_sim import RocketSim
 HERE = Path(__file__).resolve().parent
 VERSIONS_PATH = HERE / "versions.json"
 
-PARAMETERS = {
+BASE = {
     "H": 50.0,
     "V": 4.0,
     "Ti": 21.0,
@@ -44,14 +44,16 @@ PARAMETERS = {
     "dCoP": 1,
     "rho": 1.225,
     "State0": [0, 0, 0, 0, 0, 0, 0, 0.05, 0.05, 0, 0, 0, 285],
-    "wind_speed": 0.0,
-    "wind_direction": 0.0,
-    "gust_variance": 0.0,
-    "wind_seed": None,
     "Q_kalman": np.diag([1e-10, 1e-10, 1e-5, 1e-5, 1e-10, 1e-7]),
     "seed": 1,
     "t_final": 2.0,
 }
+
+SCENARIOS = [
+    {"wind_speed": 0.0, "wind_direction": 0.0, "gust_variance": 0.0, "wind_seed": 1},
+    {"wind_speed": 5.0, "wind_direction": 0.5, "gust_variance": 0.0, "wind_seed": 1},
+    {"wind_speed": 5.0, "wind_direction": 0.5, "gust_variance": 1.0, "wind_seed": 1},
+]
 
 
 def pack(array):
@@ -59,15 +61,21 @@ def pack(array):
 
 
 def fly():
-    sim = RocketSim(PARAMETERS)
-    controls = Controls(PARAMETERS, PARAMETERS)
-    runner = Runner(controls, sim)
-    np.random.seed(PARAMETERS["seed"])
-    runner.solve(State0=list(PARAMETERS["State0"]))
-    t = pack(runner.timestamps_cache[0])
-    x = pack(runner.states_cache[0])
-    u = pack(runner.controls_cache[0])
-    return hashlib.sha256(t.tobytes() + x.tobytes() + u.tobytes()).hexdigest()
+    blob = b""
+    for overrides in SCENARIOS:
+        params = dict(BASE)
+        params.update(overrides)
+        params["State0"] = list(BASE["State0"])
+        sim = RocketSim(params)
+        controls = Controls(params, params)
+        runner = Runner(controls, sim)
+        np.random.seed(params["seed"])
+        runner.solve(State0=list(params["State0"]))
+        t = pack(runner.timestamps_cache[0])
+        x = pack(runner.states_cache[0])
+        u = pack(runner.controls_cache[0])
+        blob += t.tobytes() + x.tobytes() + u.tobytes()
+    return hashlib.sha256(blob).hexdigest()
 
 
 def load_versions():
