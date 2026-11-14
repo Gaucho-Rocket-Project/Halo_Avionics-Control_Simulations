@@ -1,6 +1,6 @@
 # REQ007 — Make the dashboard, notebooks, and Visualizer run
 
-Status: proposed
+Status: executed
 
 The plant, controls, and runner on this branch are the split from REQ006. This ticket makes the rest of the repo match that split.
 
@@ -94,5 +94,13 @@ Print the name and `True` or `False` for each flight.
 Use a temporary worktree of `origin/main`. In that worktree only, change `RocketSim.solve` so the controller loop is `for i in range(6)`, and remove the real-time stop so the flight runs to `t_final`. In a second worktree of this branch, remove the real-time stop in `Runner.solve` the same way. Both flights then finish, so `RK45` takes the same steps. Set the same seed immediately before every `solve`. Do not commit either edit.
 
 Write the printed lines into this ticket.
+
+```
+dashboard True
+RocketSimTest2 halo True
+RocketSimTest2 halo jr True
+```
+
+`RocketSimTest1.ipynb` on main builds `RocketSim()` with the class defaults. This branch's sweep uses the Halo numbers, so that sweep was not hashed.
 
 Done when those lines are written here.
