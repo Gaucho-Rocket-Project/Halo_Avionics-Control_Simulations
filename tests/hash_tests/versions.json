@@ -1,5 +1,5 @@
 {
-  "current": "1.0",
+  "current": "3",
   "versions": [
     {
       "version": "1.0",
@@ -232,6 +232,10 @@
         "gy": "d5a7f3f62088a682e29e7a29a5f1b0dde9c4bdf0df54156f1aba158b109abd3f",
         "f": "0059ee10b60530f90dbee36c0f939f6724dd242cbcb89aaebb61cbf88e2e07c4"
       }
+    },
+    {
+      "version": "3",
+      "hash": "e7fa26ed83a8b1919043e776ee211fa6e44cd42f67b6d9c54941d1086a193588"
     }
   ]
 }
