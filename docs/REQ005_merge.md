@@ -14,3 +14,6 @@ kalman notebook
 dashbboard.py
 make sure to reproduce results that this version of code outputs byte identical code
 to Aniket's version
+
+CHANGES I HAD TO MAKE TO ROCKETSIM.PY
+changed hardcoded m0 in solve from 2.18 -> 285

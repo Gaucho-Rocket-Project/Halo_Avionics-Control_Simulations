@@ -237,7 +237,7 @@ def check():
     entry = find_version(document, name) if name else None
     if entry is None:
         print("no current baseline", file=sys.stderr)
-        return 1
+        return 1 
     
     t, x, u = fly()
 
