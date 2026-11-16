@@ -4,7 +4,7 @@ Code for simulating the trajectories of Halo and Halo Jr. under different contro
 
 ## Dashboard
 
-From the directory RocketSim, run:
+From the repository root, run:
 
 ```bash
 python dashboard.py
@@ -12,15 +12,17 @@ python dashboard.py
 
 Open the local address printed in the terminal to configure a flight and view its 3D animation, trajectory, and telemetry.
 
-![Dashboard showing a rocket flight](../RocketSim/dashboard/dashboard.png)
+![Dashboard showing a rocket flight](../dashboard/dashboard.png)
 
 Visual inspired by https://github.com/aryamehr2k/rocket-landing-rl-simulator.
 
-## RocketSim.py
+## simulation/halo_sim.py
 
-RocketSim.py defines the rocket’s flight physics and the Controls class. The physics model evolves position, velocity, orientation, angular velocity, and mass while accounting for thrust, aerodynamics, gravity, wind, and gusts.
+The plant is `simulation/halo_sim.py`. It evolves position, velocity, orientation, angular velocity, and mass while accounting for thrust, aerodynamics, gravity, wind, and gusts.
 
-Controls implements LQR guidance for thrust and gimbal commands, a Kalman filter for state estimation, and roll control for a cold-gas thruster based reaction control system. Simulation runs cache their timestamps, states, and control commands for plotting and playback.
+The controller is `controls/halo_controls.py`. It implements LQR guidance for thrust and gimbal commands, a Kalman filter for state estimation, and roll control for a cold-gas thruster based reaction control system.
+
+The flight loop is `runner/halo_runner.py`. It caches timestamps, states, and control commands for plotting and playback.
 
 ## RocketSimTest2.ipynb
 

@@ -235,7 +235,9 @@ def run_simulation(config: dict[str, Any]) -> dict[str, Any]:
     os.environ.setdefault("MPLCONFIGDIR", str(Path(tempfile.gettempdir()) / "halo-matplotlib"))
     try:
         import numpy as np
-        import RocketSim as RocketSim
+        from controls.halo_controls import Controls
+        from runner.halo_runner import Runner
+        from simulation.halo_sim import RocketSim
     except ImportError as exc:
         raise RuntimeError(
             f"RocketSim dependency is missing ({exc.name}). Install numpy, scipy, matplotlib, and control in this Python environment."
@@ -244,65 +246,52 @@ def run_simulation(config: dict[str, Any]) -> dict[str, Any]:
     rocket = config["rocket"]
     controller = config["controller"]
     wind = config["wind"]
-    sim = RocketSim.RocketSim(
-        T=rocket["T"],
-        P_max=rocket["P_max"],
-        m0=rocket["m0"],
-        m_dot=rocket["m_dot"],
-        dNoz=rocket["dNoz"],
-        t_final=rocket["t_final"],
-        l=rocket["l"],
-        r=rocket["r"],
-        Tau0=rocket["Tau0"],
-        Cd0=rocket["Cd0"],
-        Cl0=rocket["Cl0"],
-        S0=rocket["S0"],
-        dCoP=rocket["dCoP"],
-        rho=rocket["rho"],
-        wind_speed=wind["speed"],
-        wind_direction=math.radians(wind["direction_deg"]),
-        gust_variance=wind["gust_variance"],
-        wind_seed=config["seed"],
-    )
-    sim.g = rocket["g"]
-    # These attributes are documented on RocketSim even though the current
-    # constructor/solver gets them from Controls and solve(), respectively.
-    sim.control_frequency = controller["control_frequency"]
-    sim.dt = 1.0 / controller["control_frequency"]
-    sim.State0 = list(config["state"])
-    sim.Q_kalman = np.diag(rocket["Q_kalman"])
-    q_matrix = np.diag(controller["Q"])
-    r_matrix = np.diag(controller["R"])
-    controls = RocketSim.Controls(
-        H=controller["H"],
-        V=controller["V"],
-        Ti=controller["Ti"],
-        Th=controller["Th"],
-        Tf=controller["Tf"],
-        Q=q_matrix,
-        R=r_matrix,
-        control_frequency=controller["control_frequency"],
-        rocket=sim,
-    )
-    # Controls.__init__ currently fixes Z at 0.83; set_params rebuilds the
-    # reference trajectory and state-space matrices with the dashboard value.
-    controls.set_params(
-        controller["H"], controller["V"], controller["Ti"], controller["Th"],
-        controller["Tf"], controller["Z"], q_matrix, r_matrix,
-        controller["control_frequency"], sim,
-    )
+    params = {
+        "T": rocket["T"],
+        "P_max": rocket["P_max"],
+        "m0": rocket["m0"],
+        "m_dot": rocket["m_dot"],
+        "g": rocket["g"],
+        "dNoz": rocket["dNoz"],
+        "t_final": rocket["t_final"],
+        "l": rocket["l"],
+        "r": rocket["r"],
+        "Tau0": rocket["Tau0"],
+        "Cd0": rocket["Cd0"],
+        "Cl0": rocket["Cl0"],
+        "S0": rocket["S0"],
+        "dCoP": rocket["dCoP"],
+        "rho": rocket["rho"],
+        "Q_kalman": np.diag(rocket["Q_kalman"]),
+        "H": controller["H"],
+        "V": controller["V"],
+        "Ti": controller["Ti"],
+        "Th": controller["Th"],
+        "Tf": controller["Tf"],
+        "Z": controller["Z"],
+        "Q": np.diag(controller["Q"]),
+        "R": np.diag(controller["R"]),
+        "R_kalman": np.diag([1.0, 1.0, 1.0, 1.0, 1.0, 1.0]) * 1e-5,
+        "control_frequency": controller["control_frequency"],
+        "wind_speed": wind["speed"],
+        "wind_direction": math.radians(wind["direction_deg"]),
+        "gust_variance": wind["gust_variance"],
+        "wind_seed": config["seed"],
+    }
+    sim = RocketSim(params)
+    controls = Controls(params, params)
+    runner = Runner(controls, sim)
 
     np.random.seed(config["seed"])
-    sim.clear_cache()
-    sim.with_control_algo(controls.LQR_control_algo).solve(State0=list(config["state"]))
-    if not sim.timestamps_cache or not sim.timestamps_cache[-1]:
+    runner.solve(State0=list(config["state"]))
+    if not runner.timestamps_cache or not runner.timestamps_cache[-1]:
         raise RuntimeError("RocketSim completed without producing trajectory samples")
 
-    raw_t = np.asarray(sim.timestamps_cache[-1], dtype=float)
-    raw_states = np.asarray(sim.states_cache[-1], dtype=float)
-    # RocketSim stores each completed run as (P, gx, gy, f) rows. Column 0
+    raw_t = np.asarray(runner.timestamps_cache[-1], dtype=float)
+    raw_states = np.asarray(runner.states_cache[-1], dtype=float)
+    # The runner stores each completed run as (P, gx, gy, f) rows. Column 0
     # is the initial command; the remaining columns align with raw_t.
-    raw_controls = np.asarray(sim.controls_cache[-1], dtype=float)[:, 1:].T
+    raw_controls = np.asarray(runner.controls_cache[-1], dtype=float)[:, 1:].T
     sample_count = min(len(raw_t), raw_states.shape[1], len(raw_controls))
     raw_t = raw_t[:sample_count]
     raw_states = raw_states[:, :sample_count]
@@ -353,7 +342,7 @@ def run_simulation(config: dict[str, Any]) -> dict[str, Any]:
     final = states[:, -1]
     horizontal_distance = math.hypot(float(final[0]), float(final[1]))
     speed = float(np.linalg.norm(final[3:6]))
-    status_code = int(sim.status_cache[-1]) if sim.status_cache else 0
+    status_code = int(runner.status_cache[-1]) if runner.status_cache else 0
     status_messages = {
         0: "Reached the configured final simulation time",
         1: "RocketSim stopped after its 10 second solver-time limit",
