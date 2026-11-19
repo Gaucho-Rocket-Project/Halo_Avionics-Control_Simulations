@@ -21,6 +21,7 @@ class Controls():
         self.Q = control["Q"]
         self.R = control["R"]
         self.R_kalman = control["R_kalman"]
+        self.T_lim = control.get("T_lim", vehicle["T"])
         self.control_frequency = control["control_frequency"]
         self.dt = 1 / self.control_frequency
         # Breakpoints of the altitude reference. x1 and x2 bound the climb,
@@ -100,7 +101,8 @@ class Controls():
         #max throttle rate
         dP = P-P0
         P = P0 + np.clip((dP/self.dt),-0.5,0.5)*self.dt / bP #update P with damping
-        P = np.clip(P,0,self.vehicle["P_max"]) #min/max throttle
+        P_min = max(0.0, 1.0 - self.T_lim / self.vehicle["T"])
+        P = np.clip(P, P_min, self.vehicle["P_max"]) #min/max throttle
 
         #Gimbal
         bgamma = 1.0 #gimbal damping

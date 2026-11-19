@@ -350,6 +350,28 @@ function drawCharts(cursor = 0) {
   track.context.beginPath();
   track.context.arc(px(current[0]), py(current[1]), 3 * track.ratio, 0, 2 * Math.PI);
   track.context.fill();
+
+  const thrust = chartBase($('thrustChart'));
+  const thrustValues = frames.map((frame) => frame.thrust);
+  const maxThrust = Math.max(1, ...thrustValues);
+  const tty = (value) => thrust.height - value / maxThrust * thrust.height;
+  const thrustPoints = [];
+  for (let index = 0; index < frames.length; index += stride) thrustPoints.push([frames[index].t, frames[index].thrust]);
+  plotLine(thrust.context, thrustPoints, tx, tty, palette('--blue'), thrust.ratio);
+  const tMaxY = tty(flight.vehicle.max_thrust);
+  thrust.context.strokeStyle = palette('--aqua');
+  thrust.context.lineWidth = thrust.ratio;
+  thrust.context.setLineDash([4 * thrust.ratio, 4 * thrust.ratio]);
+  thrust.context.beginPath();
+  thrust.context.moveTo(0, tMaxY);
+  thrust.context.lineTo(thrust.width, tMaxY);
+  thrust.context.stroke();
+  thrust.context.setLineDash([]);
+  thrust.context.strokeStyle = palette('--accent');
+  thrust.context.beginPath();
+  thrust.context.moveTo(tx(frames[cursor].t), 0);
+  thrust.context.lineTo(tx(frames[cursor].t), thrust.height);
+  thrust.context.stroke();
 }
 
 function showFrame(index, forceTrail = false) {
