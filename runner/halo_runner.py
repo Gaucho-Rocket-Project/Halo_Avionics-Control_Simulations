@@ -13,16 +13,16 @@ from scipy.integrate import RK45
 
 
 class Runner:
-    def __init__(self, controls, sim):
+    def __init__(self, controls, sim): # controls and sim are instances of RocketSim and Controls classes
         self.sim = sim
         self.controls = controls
         self.clear_cache()
 
     def solve(self, State0=None):
         if State0 is None:
-            State0 = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, self.sim.params["m0"]]
+            State0 = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, self.sim.m0]
        
-        initial_command = [1 - (self.sim.params["m0"] * self.sim.params["g"] / self.sim.params["T"]), 0, 0, 0]
+        initial_command = [1 - (self.sim.m0 * self.sim.g / self.sim.T), 0, 0, 0]
         self.controls_cache.append([initial_command])
         self.sim.command = initial_command
         control_times = [0]
@@ -42,15 +42,15 @@ class Runner:
         # next control tick makes it land on every scheduled update time.
         max_physics_step = self.controls.dt / 10
         control_tick = 1
-        next_control_time = min(control_tick * self.controls.dt, self.sim.params["t_final"])
-        time_tolerance = 1e-10 * max(1.0, self.sim.params["t_final"])
+        next_control_time = min(control_tick * self.controls.dt, self.sim.t_final)
+        time_tolerance = 1e-10 * max(1.0, self.sim.t_final)
         start_time = time.time()
-        solver = RK45(self.sim.update, 0, State0, self.sim.params["t_final"], max_step=max_physics_step)
+        solver = RK45(self.sim.update, 0, State0, self.sim.t_final, max_step=max_physics_step)
         while solver.status == "running":
             remaining = next_control_time - solver.t
             if remaining <= time_tolerance:
                 control_tick += 1
-                next_control_time = min(control_tick * self.controls.dt, self.sim.params["t_final"])
+                next_control_time = min(control_tick * self.controls.dt, self.sim.t_final)
                 remaining = next_control_time - solver.t
             solver.max_step = min(max_physics_step, remaining)
             solver.step()
@@ -77,7 +77,7 @@ class Runner:
                 solver.f = solver.fun(solver.t, solver.y)
             if solver.t >= next_control_time - time_tolerance:
                 control_tick += 1
-                next_control_time = min(control_tick * self.controls.dt, self.sim.params["t_final"])
+                next_control_time = min(control_tick * self.controls.dt, self.sim.t_final)
 
             if time.time() - start_time > 10:
                 solver.status = "stopped"
@@ -100,7 +100,7 @@ class Runner:
 
     def plot_cache(self, labels=["", "", "", "", "", ""], interval=(0, 0)):
         if interval == (0, 0):
-            interval = (0, self.sim.params["t_final"])
+            interval = (0, self.sim.t_final)
         Runner.plot(self.timestamps_cache, self.states_cache, labels, True, interval)
 
     @staticmethod
