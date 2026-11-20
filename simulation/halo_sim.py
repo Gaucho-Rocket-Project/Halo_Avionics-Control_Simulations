@@ -34,8 +34,6 @@ class RocketSim:
         self.gust_time_constant = 1.0
         self.gust_dt = 0.05
 
-        self.position_variance : float = params["position_variance"]
-        self.velocity_variance : float = params["velocity_variance"]
         self.Q_kalman : np.ndarray = params["Q_kalman"]
 
         self.command = [0, 0, 0, 0]

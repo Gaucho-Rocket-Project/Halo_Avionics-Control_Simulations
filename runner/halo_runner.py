@@ -18,9 +18,9 @@ class Runner:
         self.controls = controls
         self.clear_cache()
 
-    def solve(self, State0=None):
-        if State0 is None:
-            State0 = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, self.sim.m0]
+    def solve(self, State0):
+        State0 = list(State0)
+        State0.append(self.sim.m0)
        
         initial_command = [1 - (self.sim.m0 * self.sim.g / self.sim.T), 0, 0, 0]
         self.controls_cache.append([initial_command])
