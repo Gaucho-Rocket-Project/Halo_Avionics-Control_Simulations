@@ -71,7 +71,7 @@ def fly():
         params.update(overrides)
         params["State0"] = list(BASE["State0"])
         sim = RocketSim(params)
-        controls = Controls(params, params)
+        controls = Controls(params)
         runner = Runner(controls, sim)
         np.random.seed(params["seed"])
         runner.solve(State0=list(params["State0"]))
