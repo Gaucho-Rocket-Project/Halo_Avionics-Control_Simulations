@@ -35,7 +35,6 @@ class RocketSim:
         self.gust_dt = 0.05
 
         self.Q_kalman : np.ndarray = params["Q_kalman"]
-
         self.command = [0, 0, 0, 0]
         self.configure_wind(params["wind_speed"], params["wind_direction"], params["gust_variance"], params["wind_seed"])
 

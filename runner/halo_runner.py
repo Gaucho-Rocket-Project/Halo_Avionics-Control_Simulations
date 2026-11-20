@@ -19,6 +19,8 @@ class Runner:
         self.clear_cache()
 
     def solve(self, State0):
+        if len(State0) != 12:
+            raise ValueError("State0 length should be 12, m0 is appended in halo_runner")
         State0 = list(State0)
         State0.append(self.sim.m0)
        
