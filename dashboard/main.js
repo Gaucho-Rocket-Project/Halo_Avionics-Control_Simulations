@@ -45,7 +45,6 @@ const STATE_FIELDS = [
   ['dx', 'ẋ', 'm/s'], ['dy', 'ẏ', 'm/s'], ['dz', 'ż', 'm/s'],
   ['phi', 'φ', 'rad'], ['theta', 'θ', 'rad'], ['psi', 'ψ', 'rad'],
   ['dphi', 'φ̇', 'rad/s'], ['dtheta', 'θ̇', 'rad/s'], ['dpsi', 'ψ̇', 'rad/s'],
-  ['mass', 'mass', 'kg'],
 ];
 
 const WIND_FIELDS = [
@@ -189,15 +188,6 @@ function renderForm(config) {
       matrices.append(field(matrix.names[index], `${matrix.key}${index + 1}`, '', numberInput(value, 'any', `${matrix.group}.${matrix.key}`, index)));
     });
   }
-
-  // The default state mass follows m0 until the user deliberately changes it.
-  const m0Input = form.querySelector('[data-path="rocket.m0"]');
-  const stateMass = form.querySelector('[data-path="state"][data-index="12"]');
-  let lastMass = Number(m0Input.value);
-  m0Input.addEventListener('input', () => {
-    if (Number(stateMass.value) === lastMass) stateMass.value = m0Input.value;
-    lastMass = Number(m0Input.value);
-  });
 }
 
 function readForm() {

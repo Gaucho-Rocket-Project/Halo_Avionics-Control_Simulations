@@ -47,7 +47,7 @@ BASE = {
     "S0": 0.126,
     "dCoP": 1,
     "rho": 1.225,
-    "State0": [0, 0, 0, 0, 0, 0, 0, 0.05, 0.05, 0, 0, 0, 285],
+    "State0": [0, 0, 0, 0, 0, 0, 0, 0.05, 0.05, 0, 0, 0],
     "Q_kalman": np.diag([1e-10, 1e-10, 1e-5, 1e-5, 1e-10, 1e-7]),
     "seed": 1,
     "t_final": 2.0,
@@ -71,7 +71,7 @@ def fly():
         params.update(overrides)
         params["State0"] = list(BASE["State0"])
         sim = RocketSim(params)
-        controls = Controls(params, params)
+        controls = Controls(params)
         runner = Runner(controls, sim)
         np.random.seed(params["seed"])
         runner.solve(State0=list(params["State0"]))

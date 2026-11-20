@@ -23,6 +23,8 @@ from typing import Any
 from urllib.parse import unquote, urlparse
 import webbrowser
 
+from parameters import halojr_params
+
 
 ROOT = Path(__file__).resolve().parent
 STATIC_ROOT = ROOT / "dashboard"
@@ -34,45 +36,55 @@ MAX_PLAYBACK_FRAMES = 9_000
 RENDERED_ROCKET_HEIGHT_M = 1.0
 RENDERED_LEG_FRACTION = 0.18
 
-DEFAULT_CONFIG: dict[str, Any] = {
-    "rocket": {
-        "T": 38.0,
-        "P_max": 0.9,
-        "m0": 2.180,
-        "m_dot": 0,
-        "g": 9.8,
-        "dNoz": 0.32,
-        "t_final": 20.0,
-        "l": 0.7,
-        "r": 0.05,
-        "Tau0": 0.15,
-        "Cd0": 0.8,
-        "Cl0": 6.28,
-        "S0": 0.0078,
-        "dCoP": -0.03,
-        "rho": 1.225,
-        "Q_kalman": [1e-10, 1e-10, 1e-5, 1e-5, 1e-10, 1e-7],
-    },
-    "controller": {
-        "H": 10.0,
-        "V": 4.0,
-        "Ti": 4.60,
-        "Th": 10.0,
-        "Tf": 19.6,
-        "Z": 2.30419829,
-        "Q": [4,53,4,5000,131,8.2],
-        "R": [200,1500],
-        "control_frequency": 15.0,
-    },
-    "wind": {
-        "speed": 0.0,
-        "direction_deg": 0.0,
-        "gust_variance": 0.0,
-    },
-    # x, y, z, dx, dy, dz, phi, theta, psi, dphi, dtheta, dpsi, mass
-    "state": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 2.180],
-    "seed": 0,
-}
+def _diagonal(matrix) -> list[float]:
+    return [float(matrix[index, index]) for index in range(matrix.shape[0])]
+
+
+def config_from_parameters(params: dict[str, Any]) -> dict[str, Any]:
+    """Turn a parameters.py dict into the plain JSON config the form edits."""
+    kinematics = [float(value) for value in params["State0"]]
+    wind_seed = params["wind_seed"]
+    return {
+        "rocket": {
+            "T": float(params["T"]),
+            "P_max": float(params["P_max"]),
+            "m0": float(params["m0"]),
+            "m_dot": float(params["m_dot"]),
+            "g": float(params["g"]),
+            "dNoz": float(params["dNoz"]),
+            "t_final": float(params["t_final"]),
+            "l": float(params["l"]),
+            "r": float(params["r"]),
+            "Tau0": float(params["Tau0"]),
+            "Cd0": float(params["Cd0"]),
+            "Cl0": float(params["Cl0"]),
+            "S0": float(params["S0"]),
+            "dCoP": float(params["dCoP"]),
+            "rho": float(params["rho"]),
+            "Q_kalman": _diagonal(params["Q_kalman"]),
+        },
+        "controller": {
+            "H": float(params["H"]),
+            "V": float(params["V"]),
+            "Ti": float(params["Ti"]),
+            "Th": float(params["Th"]),
+            "Tf": float(params["Tf"]),
+            "Z": float(params["Z"]),
+            "Q": _diagonal(params["Q"]),
+            "R": _diagonal(params["R"]),
+            "control_frequency": float(params["control_frequency"]),
+        },
+        "wind": {
+            "speed": float(params["wind_speed"]),
+            "direction_deg": math.degrees(float(params["wind_direction"])),
+            "gust_variance": float(params["gust_variance"]),
+        },
+        "state": kinematics,
+        "seed": 0 if wind_seed is None else int(wind_seed),
+    }
+
+
+DEFAULT_CONFIG = config_from_parameters(halojr_params)
 
 ROCKET_LIMITS = {
     "T": (1e-6, 1e7),
@@ -163,9 +175,7 @@ def validate_config(payload: Any) -> dict[str, Any]:
     if rocket["t_final"] < controller["Tf"]:
         raise InputError("rocket.t_final must be at least controller.Tf")
 
-    state = _vector(payload.get("state"), "state", 13, -1e7, 1e7)
-    if state[12] <= 0:
-        raise InputError("state mass must be greater than zero")
+    state = _vector(payload.get("state"), "state", 12, -1e7, 1e7)
     seed = int(_number(payload.get("seed", 0), "seed", 0, 2_147_483_647))
     return {"rocket": rocket, "controller": controller, "wind": wind, "state": state, "seed": seed}
 
@@ -271,19 +281,21 @@ def run_simulation(config: dict[str, Any]) -> dict[str, Any]:
         "Z": controller["Z"],
         "Q": np.diag(controller["Q"]),
         "R": np.diag(controller["R"]),
-        "R_kalman": np.diag([1.0, 1.0, 1.0, 1.0, 1.0, 1.0]) * 1e-5,
+        "R_kalman": np.array(halojr_params["R_kalman"], dtype=float, copy=True),
         "control_frequency": controller["control_frequency"],
         "wind_speed": wind["speed"],
         "wind_direction": math.radians(wind["direction_deg"]),
         "gust_variance": wind["gust_variance"],
         "wind_seed": config["seed"],
     }
+    kinematics = list(config["state"])
+    params["State0"] = kinematics
     sim = RocketSim(params)
-    controls = Controls(params, params)
+    controls = Controls(params)
     runner = Runner(controls, sim)
 
     np.random.seed(config["seed"])
-    runner.solve(State0=list(config["state"]))
+    runner.solve(State0=kinematics)
     if not runner.timestamps_cache or not runner.timestamps_cache[-1]:
         raise RuntimeError("RocketSim completed without producing trajectory samples")
 
@@ -304,7 +316,8 @@ def run_simulation(config: dict[str, Any]) -> dict[str, Any]:
     # Include the exact launch condition and initial control in the playback.
     if raw_t[0] > 1e-9:
         raw_t = np.concatenate(([0.0], raw_t))
-        raw_states = np.column_stack((np.asarray(config["state"], dtype=float), raw_states))
+        launch_state = np.asarray([*kinematics, rocket["m0"]], dtype=float)
+        raw_states = np.column_stack((launch_state, raw_states))
         raw_controls = np.vstack((np.zeros(4), raw_controls))
 
     duration = float(raw_t[-1])
