@@ -1,6 +1,8 @@
 """Compare the compiled C controller with the original Python LQR method.
 
-Run from flight-control/: python3 tests/compare_python.py
+Run from the repository root:
+    uv run python controls/c-port/tests/compare_python.py
+
 Requires NumPy and a C compiler. Extracts the actual method using Python's AST
 so SciPy, python-control, and matplotlib are not needed. Uses previously
 generated gains; does not independently validate gain generation, the Kalman
@@ -16,11 +18,18 @@ import sys
 import tempfile
 from types import SimpleNamespace
 
-import numpy as np
+try:
+    import numpy as np
+except ModuleNotFoundError as exc:
+    raise SystemExit(
+        f"Missing Python dependency '{exc.name}'. Install NumPy "
+        "before running this comparison."
+    ) from exc
 
 
 ROOT = Path(__file__).resolve().parents[1]
-DEFAULT_SOURCE = ROOT.parent / "Halo_Avionics-Control_Simulations" / "RocketSim.py"
+REPO_ROOT = Path(__file__).resolve().parents[3]
+DEFAULT_SOURCE = REPO_ROOT / "controls" / "halo_controls.py"
 
 
 class State(ct.Structure):
@@ -32,13 +41,17 @@ class State(ct.Structure):
 
 
 class Command(ct.Structure):
-    _fields_ = [(name, ct.c_float) for name in (
-        "gimbal_x_rad", "gimbal_y_rad", "thrust_reduction",
-    )]
+    _fields_ = [
+        ("gimbal_x_rad", ct.c_float),
+        ("gimbal_y_rad", ct.c_float),
+        ("thrust_reduction", ct.c_float),
+        ("roll", ct.c_int),
+    ]
 
 
 class Goal(ct.Structure):
-    _fields_ = [("height_m", ct.c_float), ("vertical_velocity_mps", ct.c_float)]
+    _fields_ = [("height_m", ct.c_float), ("vertical_velocity_mps", ct.c_float),
+                ("shutdown", ct.c_bool)]
 
 
 def load_reference(source):
@@ -59,6 +72,7 @@ def load_reference(source):
              -5.4683648741e-01, 8.9901224699e-18, -7.2299453409e-18],
         ]),
         dt=1.0 / 15.0,
+        vehicle={"m0": 285, "g": 9.8, "T": 3000, "P_max": 0.4},
         rocket_sim_instance=SimpleNamespace(P_max=0.4),
     )
     return namespace["LQR"], reference
@@ -94,7 +108,12 @@ def main():
             "-Wpedantic", "-shared", "-fPIC", "-I", str(ROOT / "include"),
             str(ROOT / "src/lqr/lqr.c"),
             str(ROOT / "src/lqr/lqr_config.c"),
-            str(ROOT / "src/vehicle_controller.c"), "-o", str(library),
+            str(ROOT / "src/vehicle_controller.c"),
+            str(ROOT / "src/kalman_filter/kalman.c"),
+            str(ROOT / "src/kalman_filter/kalman_config.c"),
+            str(ROOT / "src/roll_control/roll_control.c"),
+            str(ROOT / "src/roll_control/roll_config.c"), "-lm",
+            "-o", str(library),
         ], check=True)
         lib = ct.CDLL(str(library))
         step = lib.vehicle_control_step

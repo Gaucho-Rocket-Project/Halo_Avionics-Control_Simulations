@@ -1,8 +1,7 @@
 """Compare the C vehicle_step() with halo_controls.py LQR_control_algo().
 
-Run from flight-control/ with the simulation repo's venv (needs numpy, scipy,
-python-control):
-    ../Halo_Avionics-Control_Simulations/.venv/bin/python tests/compare_halo_controls.py
+Run from the repository root:
+    uv run python controls/c-port/tests/compare_halo_controls.py
 
 Both sides get the same measurements every tick, but each keeps its own
 Kalman state and previous command, so float/double differences accumulate the
@@ -17,13 +16,27 @@ import subprocess
 import sys
 import tempfile
 
-import numpy as np
-
 ROOT = Path(__file__).resolve().parents[1]
-SIM = ROOT.parent / "Halo_Avionics-Control_Simulations"
-sys.path.insert(0, str(SIM))
+REPO_ROOT = Path(__file__).resolve().parents[3]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
 
-from controls.halo_controls import Controls  # noqa: E402
+try:
+    import numpy as np
+except ModuleNotFoundError as exc:
+    raise SystemExit(
+        f"Missing Python dependency '{exc.name}'. Install NumPy "
+        "before running this comparison."
+    ) from exc
+
+try:
+    from controls.halo_controls import Controls
+except ModuleNotFoundError as exc:
+    raise SystemExit(
+        "Missing Python dependency "
+        f"'{exc.name}'. Install NumPy, SciPy, and python-control "
+        "before running this comparison."
+    ) from exc
 
 PARAMS = {
     "H": 50.0, "V": 4.0, "Ti": 21.0, "Th": 10.0, "Tf": 54.0, "Z": 0.83,
