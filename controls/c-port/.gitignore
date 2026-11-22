@@ -3,4 +3,3 @@ CMakeCache.txt
 CMakeFiles
 CMakeScripts
 compile_commands.json
-tests/*.py
