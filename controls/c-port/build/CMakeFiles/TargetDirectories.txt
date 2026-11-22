@@ -1,0 +1,7 @@
+/Users/nsohmers/dev/clubs/rocketry/Halo_Avionics-Control_Simulations/controls/c-port/build/CMakeFiles/flight_control.dir
+/Users/nsohmers/dev/clubs/rocketry/Halo_Avionics-Control_Simulations/controls/c-port/build/CMakeFiles/lqr_test.dir
+/Users/nsohmers/dev/clubs/rocketry/Halo_Avionics-Control_Simulations/controls/c-port/build/CMakeFiles/vehicle_test.dir
+/Users/nsohmers/dev/clubs/rocketry/Halo_Avionics-Control_Simulations/controls/c-port/build/CMakeFiles/roll_test.dir
+/Users/nsohmers/dev/clubs/rocketry/Halo_Avionics-Control_Simulations/controls/c-port/build/CMakeFiles/test.dir
+/Users/nsohmers/dev/clubs/rocketry/Halo_Avionics-Control_Simulations/controls/c-port/build/CMakeFiles/edit_cache.dir
+/Users/nsohmers/dev/clubs/rocketry/Halo_Avionics-Control_Simulations/controls/c-port/build/CMakeFiles/rebuild_cache.dir

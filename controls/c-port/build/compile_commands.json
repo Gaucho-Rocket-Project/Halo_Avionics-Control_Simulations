@@ -1,0 +1,74 @@
+[
+{
+  "directory": "/Users/nsohmers/dev/clubs/rocketry/Halo_Avionics-Control_Simulations/controls/c-port/build",
+  "command": "/opt/homebrew/opt/ccache/libexec/cc  -I/Users/nsohmers/dev/clubs/rocketry/Halo_Avionics-Control_Simulations/controls/c-port/include -std=gnu11 -arch arm64 -o CMakeFiles/flight_control.dir/src/lqr/lqr.c.o -c /Users/nsohmers/dev/clubs/rocketry/Halo_Avionics-Control_Simulations/controls/c-port/src/lqr/lqr.c",
+  "file": "/Users/nsohmers/dev/clubs/rocketry/Halo_Avionics-Control_Simulations/controls/c-port/src/lqr/lqr.c",
+  "output": "CMakeFiles/flight_control.dir/src/lqr/lqr.c.o"
+},
+{
+  "directory": "/Users/nsohmers/dev/clubs/rocketry/Halo_Avionics-Control_Simulations/controls/c-port/build",
+  "command": "/opt/homebrew/opt/ccache/libexec/cc  -I/Users/nsohmers/dev/clubs/rocketry/Halo_Avionics-Control_Simulations/controls/c-port/include -std=gnu11 -arch arm64 -o CMakeFiles/flight_control.dir/src/lqr/lqr_config.c.o -c /Users/nsohmers/dev/clubs/rocketry/Halo_Avionics-Control_Simulations/controls/c-port/src/lqr/lqr_config.c",
+  "file": "/Users/nsohmers/dev/clubs/rocketry/Halo_Avionics-Control_Simulations/controls/c-port/src/lqr/lqr_config.c",
+  "output": "CMakeFiles/flight_control.dir/src/lqr/lqr_config.c.o"
+},
+{
+  "directory": "/Users/nsohmers/dev/clubs/rocketry/Halo_Avionics-Control_Simulations/controls/c-port/build",
+  "command": "/opt/homebrew/opt/ccache/libexec/cc  -I/Users/nsohmers/dev/clubs/rocketry/Halo_Avionics-Control_Simulations/controls/c-port/include -std=gnu11 -arch arm64 -o CMakeFiles/flight_control.dir/src/vehicle_controller.c.o -c /Users/nsohmers/dev/clubs/rocketry/Halo_Avionics-Control_Simulations/controls/c-port/src/vehicle_controller.c",
+  "file": "/Users/nsohmers/dev/clubs/rocketry/Halo_Avionics-Control_Simulations/controls/c-port/src/vehicle_controller.c",
+  "output": "CMakeFiles/flight_control.dir/src/vehicle_controller.c.o"
+},
+{
+  "directory": "/Users/nsohmers/dev/clubs/rocketry/Halo_Avionics-Control_Simulations/controls/c-port/build",
+  "command": "/opt/homebrew/opt/ccache/libexec/cc  -I/Users/nsohmers/dev/clubs/rocketry/Halo_Avionics-Control_Simulations/controls/c-port/include -std=gnu11 -arch arm64 -o CMakeFiles/flight_control.dir/src/roll_control/roll_control.c.o -c /Users/nsohmers/dev/clubs/rocketry/Halo_Avionics-Control_Simulations/controls/c-port/src/roll_control/roll_control.c",
+  "file": "/Users/nsohmers/dev/clubs/rocketry/Halo_Avionics-Control_Simulations/controls/c-port/src/roll_control/roll_control.c",
+  "output": "CMakeFiles/flight_control.dir/src/roll_control/roll_control.c.o"
+},
+{
+  "directory": "/Users/nsohmers/dev/clubs/rocketry/Halo_Avionics-Control_Simulations/controls/c-port/build",
+  "command": "/opt/homebrew/opt/ccache/libexec/cc  -I/Users/nsohmers/dev/clubs/rocketry/Halo_Avionics-Control_Simulations/controls/c-port/include -std=gnu11 -arch arm64 -o CMakeFiles/flight_control.dir/src/roll_control/roll_config.c.o -c /Users/nsohmers/dev/clubs/rocketry/Halo_Avionics-Control_Simulations/controls/c-port/src/roll_control/roll_config.c",
+  "file": "/Users/nsohmers/dev/clubs/rocketry/Halo_Avionics-Control_Simulations/controls/c-port/src/roll_control/roll_config.c",
+  "output": "CMakeFiles/flight_control.dir/src/roll_control/roll_config.c.o"
+},
+{
+  "directory": "/Users/nsohmers/dev/clubs/rocketry/Halo_Avionics-Control_Simulations/controls/c-port/build",
+  "command": "/opt/homebrew/opt/ccache/libexec/cc  -I/Users/nsohmers/dev/clubs/rocketry/Halo_Avionics-Control_Simulations/controls/c-port/include -std=gnu11 -arch arm64 -o CMakeFiles/flight_control.dir/src/kalman_filter/kalman.c.o -c /Users/nsohmers/dev/clubs/rocketry/Halo_Avionics-Control_Simulations/controls/c-port/src/kalman_filter/kalman.c",
+  "file": "/Users/nsohmers/dev/clubs/rocketry/Halo_Avionics-Control_Simulations/controls/c-port/src/kalman_filter/kalman.c",
+  "output": "CMakeFiles/flight_control.dir/src/kalman_filter/kalman.c.o"
+},
+{
+  "directory": "/Users/nsohmers/dev/clubs/rocketry/Halo_Avionics-Control_Simulations/controls/c-port/build",
+  "command": "/opt/homebrew/opt/ccache/libexec/cc  -I/Users/nsohmers/dev/clubs/rocketry/Halo_Avionics-Control_Simulations/controls/c-port/include -std=gnu11 -arch arm64 -o CMakeFiles/flight_control.dir/src/kalman_filter/kalman_config.c.o -c /Users/nsohmers/dev/clubs/rocketry/Halo_Avionics-Control_Simulations/controls/c-port/src/kalman_filter/kalman_config.c",
+  "file": "/Users/nsohmers/dev/clubs/rocketry/Halo_Avionics-Control_Simulations/controls/c-port/src/kalman_filter/kalman_config.c",
+  "output": "CMakeFiles/flight_control.dir/src/kalman_filter/kalman_config.c.o"
+},
+{
+  "directory": "/Users/nsohmers/dev/clubs/rocketry/Halo_Avionics-Control_Simulations/controls/c-port/build",
+  "command": "/opt/homebrew/opt/ccache/libexec/cc  -I/Users/nsohmers/dev/clubs/rocketry/Halo_Avionics-Control_Simulations/controls/c-port/include -std=gnu11 -arch arm64 -o CMakeFiles/flight_control.dir/src/trajectory/trajectory.c.o -c /Users/nsohmers/dev/clubs/rocketry/Halo_Avionics-Control_Simulations/controls/c-port/src/trajectory/trajectory.c",
+  "file": "/Users/nsohmers/dev/clubs/rocketry/Halo_Avionics-Control_Simulations/controls/c-port/src/trajectory/trajectory.c",
+  "output": "CMakeFiles/flight_control.dir/src/trajectory/trajectory.c.o"
+},
+{
+  "directory": "/Users/nsohmers/dev/clubs/rocketry/Halo_Avionics-Control_Simulations/controls/c-port/build",
+  "command": "/opt/homebrew/opt/ccache/libexec/cc  -I/Users/nsohmers/dev/clubs/rocketry/Halo_Avionics-Control_Simulations/controls/c-port/include -std=gnu11 -arch arm64 -o CMakeFiles/flight_control.dir/src/trajectory/trajectory_config.c.o -c /Users/nsohmers/dev/clubs/rocketry/Halo_Avionics-Control_Simulations/controls/c-port/src/trajectory/trajectory_config.c",
+  "file": "/Users/nsohmers/dev/clubs/rocketry/Halo_Avionics-Control_Simulations/controls/c-port/src/trajectory/trajectory_config.c",
+  "output": "CMakeFiles/flight_control.dir/src/trajectory/trajectory_config.c.o"
+},
+{
+  "directory": "/Users/nsohmers/dev/clubs/rocketry/Halo_Avionics-Control_Simulations/controls/c-port/build",
+  "command": "/opt/homebrew/opt/ccache/libexec/cc  -I/Users/nsohmers/dev/clubs/rocketry/Halo_Avionics-Control_Simulations/controls/c-port/include -std=gnu11 -arch arm64 -o CMakeFiles/lqr_test.dir/tests/lqr_test.c.o -c /Users/nsohmers/dev/clubs/rocketry/Halo_Avionics-Control_Simulations/controls/c-port/tests/lqr_test.c",
+  "file": "/Users/nsohmers/dev/clubs/rocketry/Halo_Avionics-Control_Simulations/controls/c-port/tests/lqr_test.c",
+  "output": "CMakeFiles/lqr_test.dir/tests/lqr_test.c.o"
+},
+{
+  "directory": "/Users/nsohmers/dev/clubs/rocketry/Halo_Avionics-Control_Simulations/controls/c-port/build",
+  "command": "/opt/homebrew/opt/ccache/libexec/cc  -I/Users/nsohmers/dev/clubs/rocketry/Halo_Avionics-Control_Simulations/controls/c-port/include -std=gnu11 -arch arm64 -o CMakeFiles/vehicle_test.dir/tests/vehicle_test.c.o -c /Users/nsohmers/dev/clubs/rocketry/Halo_Avionics-Control_Simulations/controls/c-port/tests/vehicle_test.c",
+  "file": "/Users/nsohmers/dev/clubs/rocketry/Halo_Avionics-Control_Simulations/controls/c-port/tests/vehicle_test.c",
+  "output": "CMakeFiles/vehicle_test.dir/tests/vehicle_test.c.o"
+},
+{
+  "directory": "/Users/nsohmers/dev/clubs/rocketry/Halo_Avionics-Control_Simulations/controls/c-port/build",
+  "command": "/opt/homebrew/opt/ccache/libexec/cc  -I/Users/nsohmers/dev/clubs/rocketry/Halo_Avionics-Control_Simulations/controls/c-port/include -std=gnu11 -arch arm64 -o CMakeFiles/roll_test.dir/tests/roll_test.c.o -c /Users/nsohmers/dev/clubs/rocketry/Halo_Avionics-Control_Simulations/controls/c-port/tests/roll_test.c",
+  "file": "/Users/nsohmers/dev/clubs/rocketry/Halo_Avionics-Control_Simulations/controls/c-port/tests/roll_test.c",
+  "output": "CMakeFiles/roll_test.dir/tests/roll_test.c.o"
+}
+]

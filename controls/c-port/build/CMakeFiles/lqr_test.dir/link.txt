@@ -1,0 +1,1 @@
+/opt/homebrew/opt/ccache/libexec/cc  -arch arm64 -Wl,-search_paths_first -Wl,-headerpad_max_install_names CMakeFiles/lqr_test.dir/tests/lqr_test.c.o -o lqr_test  libflight_control.a

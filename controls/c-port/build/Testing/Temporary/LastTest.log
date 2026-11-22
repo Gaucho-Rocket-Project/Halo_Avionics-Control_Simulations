@@ -1,0 +1,116 @@
+Start testing: Nov 21 17:58 PST
+----------------------------------------------------------
+1/3 Testing: lqr_checks
+1/3 Test: lqr_checks
+Command: "/Users/nsohmers/dev/clubs/rocketry/Halo_Avionics-Control_Simulations/controls/c-port/build/lqr_test"
+Directory: /Users/nsohmers/dev/clubs/rocketry/Halo_Avionics-Control_Simulations/controls/c-port/build
+"lqr_checks" start time: Nov 21 17:58 PST
+Output:
+----------------------------------------------------------
+PASS zero error: gamma                 0.0000000
+PASS zero error: P                     0.0000000
+PASS column 0: gamma                   0.0070711
+PASS column 0: P                       0.0000000
+PASS column 1: gamma                   0.0000000
+PASS column 1: P                       0.4773516
+PASS column 2: gamma                   0.0237286
+PASS column 2: P                       0.0000000
+PASS column 3: gamma                  -0.0000000
+PASS column 3: P                       0.5468365
+PASS column 4: gamma                  -0.3555239
+PASS column 4: P                      -0.0000000
+PASS column 5: gamma                  -0.2648543
+PASS column 5: P                       0.0000000
+PASS combined errors: gamma           -0.2174806
+PASS combined errors: P               -1.5710247
+
+Repeated ticks: raw requests are gamma = -2 rad and P = 1.
+tick  1: gamma = -0.0500 rad, P = 0.0500
+PASS first tick: gamma slew           -0.0500000
+PASS first tick: P slew                0.0500000
+tick  2: gamma = -0.1000 rad, P = 0.1000
+tick  3: gamma = -0.1500 rad, P = 0.1500
+tick  4: gamma = -0.2000 rad, P = 0.2000
+tick  5: gamma = -0.2200 rad, P = 0.2500
+tick  6: gamma = -0.2200 rad, P = 0.3000
+tick  7: gamma = -0.2200 rad, P = 0.3500
+tick  8: gamma = -0.2200 rad, P = 0.4000
+tick  9: gamma = -0.2200 rad, P = 0.4000
+tick 10: gamma = -0.2200 rad, P = 0.4000
+PASS gamma lower bound                -0.2200000
+PASS P upper bound                     0.4000000
+PASS gamma upper bound                 0.2200000
+PASS P lower bound                     0.0000000
+
+22 checks, 0 failures
+<end of output>
+Test time =   0.28 sec
+----------------------------------------------------------
+Test Passed.
+"lqr_checks" end time: Nov 21 17:58 PST
+"lqr_checks" time elapsed: 00:00:00
+----------------------------------------------------------
+
+2/3 Testing: vehicle_checks
+2/3 Test: vehicle_checks
+Command: "/Users/nsohmers/dev/clubs/rocketry/Halo_Avionics-Control_Simulations/controls/c-port/build/vehicle_test"
+Directory: /Users/nsohmers/dev/clubs/rocketry/Halo_Avionics-Control_Simulations/controls/c-port/build
+"vehicle_checks" start time: Nov 21 17:58 PST
+Output:
+----------------------------------------------------------
+Vehicle controller: 66 checks, 0 failures
+<end of output>
+Test time =   0.15 sec
+----------------------------------------------------------
+Test Passed.
+"vehicle_checks" end time: Nov 21 17:58 PST
+"vehicle_checks" time elapsed: 00:00:00
+----------------------------------------------------------
+
+3/3 Testing: roll_checks
+3/3 Test: roll_checks
+Command: "/Users/nsohmers/dev/clubs/rocketry/Halo_Avionics-Control_Simulations/controls/c-port/build/roll_test"
+Directory: /Users/nsohmers/dev/clubs/rocketry/Halo_Avionics-Control_Simulations/controls/c-port/build
+"roll_checks" start time: Nov 21 17:58 PST
+Output:
+----------------------------------------------------------
+PASS positive angle at rest
+PASS negative angle at rest
+PASS positive angle moving away
+PASS negative angle moving away
+PASS slow return still corrects
+PASS mirrored slow return
+PASS fast return brakes
+PASS mirrored fast return brakes
+PASS zero switch time
+PASS mirrored zero switch time
+PASS torque changes switching decision
+PASS inertia changes switching decision
+PASS below activation
+PASS at activation stays off
+PASS above activation
+PASS negative activation boundary
+PASS negative above activation
+PASS below deactivation
+PASS at deactivation remains active
+PASS above deactivation
+PASS positive previous also remains active
+PASS deadband with previous off
+PASS deadband with previous active
+PASS opposite previous direction
+PASS rate cancellation suppresses correction
+PASS zero state
+PASS zero state turns off
+PASS zero angle positive rate
+PASS zero angle negative rate
+PASS negative zero angle
+Roll controller: 30 checks, 0 failures
+<end of output>
+Test time =   0.15 sec
+----------------------------------------------------------
+Test Passed.
+"roll_checks" end time: Nov 21 17:58 PST
+"roll_checks" time elapsed: 00:00:00
+----------------------------------------------------------
+
+End testing: Nov 21 17:58 PST
