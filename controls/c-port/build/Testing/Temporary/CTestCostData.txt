@@ -1,4 +1,0 @@
-lqr_checks 1 0.284841
-vehicle_checks 1 0.153777
-roll_checks 1 0.153318
----
