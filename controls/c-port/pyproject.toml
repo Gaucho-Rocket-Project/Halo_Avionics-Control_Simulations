@@ -1,0 +1,13 @@
+[project]
+name = "halo-avionics-control-simulations"
+version = "0.1.0"
+description = "Halo flight simulation and C controller comparisons"
+requires-python = ">=3.10"
+dependencies = [
+    "control",
+    "numpy",
+    "scipy",
+]
+
+[tool.uv]
+package = false
